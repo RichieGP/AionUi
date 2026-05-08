@@ -32,6 +32,7 @@ const ConversationRow: React.FC<ConversationRowProps> = (props) => {
     checked,
     selected,
     menuVisible,
+    dimIcon = false,
   } = props;
   const layout = useLayoutContext();
   const isMobile = layout?.isMobile ?? false;
@@ -58,13 +59,22 @@ const ConversationRow: React.FC<ConversationRowProps> = (props) => {
       return <CronJobIndicator status={cronStatus} size={20} className='flex-shrink-0' />;
     }
 
+    // Agent icons: dimmed by default only inside project folders, full color on row hover.
+    // Top-level "对话" section keeps full color to preserve agent identity.
+    const dimmedClass = dimIcon
+      ? 'opacity-55 grayscale-[0.3] group-hover:opacity-100 group-hover:grayscale-0 transition'
+      : '';
+
     if (assistantInfo) {
       if (assistantInfo.isEmoji) {
-        // Emoji glyphs render with built-in padding, so 16px text ≈ 18px line icon visual weight
-        return <span className='text-16px leading-none flex-shrink-0'>{assistantInfo.logo}</span>;
+        return <span className={classNames('text-16px leading-none flex-shrink-0', dimmedClass)}>{assistantInfo.logo}</span>;
       }
       return (
-        <img src={assistantInfo.logo} alt={assistantInfo.name} className='w-18px h-18px rounded-50% flex-shrink-0' />
+        <img
+          src={assistantInfo.logo}
+          alt={assistantInfo.name}
+          className={classNames('w-18px h-18px rounded-50% flex-shrink-0', dimmedClass)}
+        />
       );
     }
 
@@ -72,11 +82,15 @@ const ConversationRow: React.FC<ConversationRowProps> = (props) => {
     const logo = getAgentLogo(backendKey);
     if (logo) {
       return (
-        <img src={logo} alt={`${backendKey || 'agent'} logo`} className='w-18px h-18px rounded-50% flex-shrink-0' />
+        <img
+          src={logo}
+          alt={`${backendKey || 'agent'} logo`}
+          className={classNames('w-18px h-18px rounded-50% flex-shrink-0', dimmedClass)}
+        />
       );
     }
 
-    return <MessageOne theme='outline' size='20' className='line-height-0 flex-shrink-0' />;
+    return <MessageOne theme='outline' size='20' className={classNames('line-height-0 flex-shrink-0', dimmedClass)} />;
   };
 
   const handleRowClick = () => {
@@ -121,7 +135,7 @@ const ConversationRow: React.FC<ConversationRowProps> = (props) => {
         id={'c-' + conversation.id}
         className={classNames(
           'chat-history__item h-34px rd-8px flex items-center group cursor-pointer relative overflow-hidden shrink-0 conversation-item [&.conversation-item+&.conversation-item]:mt-1px min-w-0 transition-colors',
-          collapsed ? 'justify-center px-0' : 'justify-start gap-10px px-14px',
+          collapsed ? 'justify-center px-0' : 'justify-start gap-6px px-14px',
           {
             'hover:bg-[rgba(var(--primary-6),0.14)]': !batchMode,
             '!bg-active': selected,

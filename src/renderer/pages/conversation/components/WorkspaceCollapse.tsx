@@ -21,6 +21,8 @@ interface WorkspaceCollapseProps {
   className?: string;
   /** 侧栏是否折叠 - 折叠时隐藏组标题并移除缩进 */
   siderCollapsed?: boolean;
+  /** 标题尾部插槽 - 例如 hover 显示的菜单按钮，点击不会触发 onToggle */
+  trailing?: React.ReactNode;
 }
 
 /**
@@ -33,6 +35,7 @@ const WorkspaceCollapse: React.FC<WorkspaceCollapseProps> = ({
   children,
   className,
   siderCollapsed = false,
+  trailing,
 }) => {
   // 侧栏折叠时，强制展开内容并隐藏头部
   const showContent = siderCollapsed || expanded;
@@ -42,20 +45,27 @@ const WorkspaceCollapse: React.FC<WorkspaceCollapseProps> = ({
       {/* 折叠头部 - 侧栏折叠时隐藏 */}
       {!siderCollapsed && (
         <div
-          className='flex items-center gap-8px h-40px px-10px cursor-pointer hover:bg-[rgba(var(--primary-6),0.14)] rd-8px transition-colors min-w-0'
+          className='flex items-center gap-10px h-32px pl-6px pr-14px cursor-pointer hover:bg-[rgba(var(--primary-6),0.14)] rd-8px transition-colors min-w-0 group'
           onClick={onToggle}
         >
-          {/* 展开/收起文件夹图标 — 28px 容器与其他 sider 行对齐 */}
-          <span className='w-28px h-28px flex items-center justify-center shrink-0'>
+          {/* 文件夹图标 — 24px 容器对齐其他 sider 行；线框风格、低饱和 */}
+          <span className='size-24px flex items-center justify-center shrink-0 text-t-tertiary group-hover:text-t-secondary transition-colors'>
             {expanded ? (
-              <FolderOpen size={20} className='line-height-0' />
+              <FolderOpen theme='outline' size={16} fill='currentColor' className='line-height-0' />
             ) : (
-              <FolderClose size={20} className='line-height-0' />
+              <FolderClose theme='outline' size={16} fill='currentColor' className='line-height-0' />
             )}
           </span>
 
           {/* 标题内容 */}
           <div className='flex-1 min-w-0 overflow-hidden'>{header}</div>
+
+          {/* 尾部操作（如菜单按钮）— 阻止点击冒泡到 onToggle */}
+          {trailing && (
+            <div className='shrink-0 flex items-center' onClick={(e) => e.stopPropagation()}>
+              {trailing}
+            </div>
+          )}
         </div>
       )}
 
