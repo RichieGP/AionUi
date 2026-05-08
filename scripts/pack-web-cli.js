@@ -62,8 +62,13 @@ execSync(`bun build --compile --target=${bunTarget} --outfile="${executablePath}
 });
 console.log(`  → ${executablePath}`);
 
-// 5. Copy package.json (for version lookup at runtime) and README
-fs.cpSync(path.join(projectRoot, 'packages/web-cli/package.json'), path.join(tarballContentDir, 'package.json'));
+// 5. Copy package.json with repo-root version stamped in (for runtime lookup)
+// The source packages/web-cli/package.json is pinned to "0.0.0" as a workspace
+// package and never gets bumped; stamping the real repo version here lets
+// `aionui-web version` match the tarball filename.
+const srcPkg = JSON.parse(fs.readFileSync(path.join(projectRoot, 'packages/web-cli/package.json'), 'utf8'));
+srcPkg.version = version;
+fs.writeFileSync(path.join(tarballContentDir, 'package.json'), JSON.stringify(srcPkg, null, 2) + '\n');
 
 // 6. Copy static files (SPA) from desktop renderer build output
 // Note: electron-vite writes to the repo-root `out/`, NOT packages/desktop/out/

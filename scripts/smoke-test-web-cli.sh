@@ -83,6 +83,45 @@ else
   exit 1
 fi
 
+# 6. HTTP-level smoke: start web-cli, curl the root, check for SPA shell
+echo ""
+echo "6. Testing HTTP server responds with SPA index..."
+HTTP_PORT=25899
+DATA_DIR="$(mktemp -d)/aionui-web-data"
+# Graceful fallback will kick in when backend is missing: static server alone
+# still serves index.html, which is what we assert below.
+./aionui-web start --port "$HTTP_PORT" --data-dir "$DATA_DIR" > /tmp/aionui-web.log 2>&1 &
+SERVER_PID=$!
+
+# Wait up to 15s for HTTP to come up
+for i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15; do
+  if curl -sf "http://127.0.0.1:${HTTP_PORT}/" > /tmp/aionui-web.html 2>/dev/null; then
+    break
+  fi
+  sleep 1
+done
+
+# Stop the server regardless of the probe outcome
+kill "$SERVER_PID" 2>/dev/null || true
+wait "$SERVER_PID" 2>/dev/null || true
+
+if [ ! -s /tmp/aionui-web.html ]; then
+  echo "❌ HTTP probe failed — no response body. Server log:"
+  cat /tmp/aionui-web.log
+  exit 1
+fi
+
+# Look for the SPA shell signature — <html + <div id="root" or similar marker
+if grep -q '<html' /tmp/aionui-web.html && grep -qE '<(div id="root"|script)' /tmp/aionui-web.html; then
+  echo "✓ HTTP root returns SPA index ($(wc -c < /tmp/aionui-web.html) bytes)"
+else
+  echo "❌ HTTP root response does not look like SPA index:"
+  head -20 /tmp/aionui-web.html
+  echo "---server log---"
+  cat /tmp/aionui-web.log
+  exit 1
+fi
+
 # Cleanup
 cd -
 rm -rf "$TEMP_DIR"
