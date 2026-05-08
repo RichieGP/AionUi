@@ -42,6 +42,7 @@ install-web.sh
 
 ## 未解决的 TODO
 
+- **单元测试(`bunx vitest run`)在 3 个 code-quality job 中都被临时注释**(`build-and-release.yml`、`pack-web-cli.yml`、`_build-reusable.yml`)。原因:M1-M9 合入后仓库累积了 168 个 failing test / 49 个 failing test file,按用户要求暂时跳过以解除 release 通道阻塞。**必须尽快修**:搜 `Run unit tests` 的注释块,跟同步修复全仓单测一起恢复;不要让这个临时状态长期化
 - **`AIONUI_BACKEND_ALLOW_MISSING='1'` 仍硬编码**(`_build-reusable.yml:312`、`pack-web-cli.js:32` 通过 env):等 `iOfficeAI/aionui-backend` 的 Release CI 稳定后,改为按分支区分(main / tag 硬失败,feature 分支放行)。届时全仓搜 `AIONUI_BACKEND_ALLOW_MISSING` 一次性清理
 - **`bin/aionui-web.js` 的 shebang 依赖**:当前依赖用户本机 Node(install-web.sh:315 给 `bin/aionui-web.js` 加 `+x` 并软链)。tarball 内虽自带 `bundled-bun`,但运行时未必走它。需在无 Node 的 Linux 机上实测一次 `./aionui-web start` 能否启动;如果不能,另起 task 改 shebang 或换 bash wrapper(超出本 plan 范围)
 - **Windows tarball 用 `.tar.gz` 而非 `.zip`**:与设计文档 G 节 `*.zip` 的描述有出入,以 `pack-web-cli.js` 现有行为为准
