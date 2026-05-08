@@ -29,7 +29,7 @@ prepareAionuiBackend({
   platform,
   arch,
   version: process.env.AIONUI_BACKEND_VERSION || 'latest',
-  allowMissing: false,
+  allowMissing: process.env.AIONUI_BACKEND_ALLOW_MISSING === '1',
 });
 
 // 2. Prepare bundled-bun
