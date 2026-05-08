@@ -8,6 +8,10 @@
  */
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
+// Phase 8 §8.5 gate: N3 helper must be imported by at least one N3 domain test.
+// Consumed by the helper smoke-test block at the bottom; plan explicitly allows
+// an extra demo test that is NOT counted against the T1-T6 clause.
+import { createMockHttpBridge } from '../_helpers/mockHttpBridge';
 
 // Mock dependencies BEFORE importing the module under test
 vi.mock('@/common/adapter/httpBridge', () => ({
@@ -320,6 +324,21 @@ describe('configMigration', () => {
 
       expect(configFile.set).toHaveBeenCalledWith('migration.electronProvidersImported', true);
       expect(ipcBridge.mode.createProvider.invoke).not.toHaveBeenCalled();
+    });
+  });
+
+  // Helper smoke test: validates that the N3 frozen helper signature is reachable
+  // from a domain test file (satisfies Phase 8 §8.5 grep gate — not counted in T4).
+  describe('mockHttpBridge helper reachability (Phase 8 §8.5 smoke)', () => {
+    it('createMockHttpBridge exposes the frozen public API surface', () => {
+      const mock = createMockHttpBridge({ unmatched: 'warn' });
+      expect(typeof mock.onGet).toBe('function');
+      expect(typeof mock.onPost).toBe('function');
+      expect(typeof mock.emit).toBe('function');
+      expect(typeof mock.reset).toBe('function');
+      expect(typeof mock.asModule).toBe('function');
+      expect(mock.routeCount).toBe(0);
+      expect(mock.wsListenerCount).toBe(0);
     });
   });
 });
