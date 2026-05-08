@@ -71,7 +71,12 @@ fs.mkdirSync(path.dirname(backendDest), { recursive: true });
 fs.cpSync(backendSrc, backendDest, { recursive: true });
 
 // Copy bundled-bun
-const bunSrc = path.join(projectRoot, 'resources/bundled-bun', `${platform}-${arch}`, platform === 'win32' ? 'bun.exe' : 'bun');
+const bunSrc = path.join(
+  projectRoot,
+  'resources/bundled-bun',
+  `${platform}-${arch}`,
+  platform === 'win32' ? 'bun.exe' : 'bun'
+);
 const bunDest = path.join(tarballContentDir, 'bundled-bun', platform === 'win32' ? 'bun.exe' : 'bun');
 fs.mkdirSync(path.dirname(bunDest), { recursive: true });
 fs.copyFileSync(bunSrc, bunDest);
