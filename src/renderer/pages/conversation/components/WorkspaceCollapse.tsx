@@ -48,8 +48,8 @@ const WorkspaceCollapse: React.FC<WorkspaceCollapseProps> = ({
           className='flex items-center gap-8px h-34px pl-10px pr-8px cursor-pointer hover:bg-fill-3 rd-8px transition-colors min-w-0 group'
           onClick={onToggle}
         >
-          {/* 文件夹图标 — 24px 容器对齐其他 sider 行；线框风格、低饱和 */}
-          <span className='size-22px flex items-center justify-center shrink-0 text-t-secondary'>
+          {/* 文件夹图标 — 颜色与 header 文本同步退一层 */}
+          <span className='size-22px flex items-center justify-center shrink-0 text-[var(--color-text-2)] group-hover:text-t-primary transition-colors'>
             {expanded ? (
               <FolderOpen theme='outline' size={16} fill='currentColor' className='line-height-0' />
             ) : (
@@ -69,12 +69,8 @@ const WorkspaceCollapse: React.FC<WorkspaceCollapseProps> = ({
         </div>
       )}
 
-      {/* 折叠内容 - 子项缩进 20px,使子项 icon 中心落在父级文字起点附近,形成清晰的层级 */}
-      {showContent && (
-        <div className={classNames('workspace-collapse-content min-w-0', { 'pl-30px': !siderCollapsed })}>
-          {children}
-        </div>
-      )}
+      {/* 折叠内容 — row 保持全宽以便选中态 bg 填满整行；视觉缩进由 ConversationRow 的 dimIcon 分支自行处理 */}
+      {showContent && <div className='workspace-collapse-content min-w-0'>{children}</div>}
     </div>
   );
 };

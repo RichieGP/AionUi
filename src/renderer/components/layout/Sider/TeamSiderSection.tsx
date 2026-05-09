@@ -165,13 +165,14 @@ const TeamSiderSection: React.FC<TeamSiderSectionProps> = ({
               />
             </span>
             <div
-              className='ml-auto h-18px w-18px rd-4px flex items-center justify-center hover:bg-fill-3 transition-all shrink-0 cursor-pointer'
+              className='ml-auto -mr-4px size-20px rd-4px flex items-center justify-center hover:bg-fill-3 transition-all shrink-0 cursor-pointer text-t-secondary hover:text-t-primary opacity-0 group-hover/label:opacity-100 transition-opacity'
               onClick={() => setCreateTeamVisible(true)}
             >
-              <Plus theme='outline' size='12' fill='var(--color-text-3)' style={{ lineHeight: 0 }} />
+              <Plus theme='outline' size='14' fill='currentColor' style={{ lineHeight: 0 }} />
             </div>
           </div>
-          {expanded && sortedTeams.length > 0 &&
+          {expanded &&
+            sortedTeams.length > 0 &&
             sortedTeams.map((team) => {
               const isPinned = pinnedIds.includes(team.id);
               const menuItems: SiderMenuItem[] = [

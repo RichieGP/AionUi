@@ -87,16 +87,16 @@ const SiderToolbar: React.FC<SiderToolbarProps> = ({
       >
         <div
           className={classNames(
-            'h-34px w-34px rd-0.5rem flex items-center justify-center cursor-pointer shrink-0 transition-all border border-solid border-transparent',
+            'size-26px rd-6px flex items-center justify-center cursor-pointer shrink-0 transition-colors border border-solid border-transparent text-t-secondary hover:text-t-primary',
             isMobile && 'sider-action-icon-btn-mobile',
             {
-              'hover:bg-fill-2 hover:border-[var(--color-border-2)]': !isBatchMode,
-              'bg-[rgba(var(--primary-6),0.12)] border-[rgba(var(--primary-6),0.24)] text-primary': isBatchMode,
+              'hover:bg-fill-3': !isBatchMode,
+              'bg-[rgba(var(--primary-6),0.12)] border-[rgba(var(--primary-6),0.24)] !text-primary': isBatchMode,
             }
           )}
           onClick={onToggleBatchMode}
         >
-          <ListCheckbox theme='outline' size='20' className='block leading-none shrink-0' style={{ lineHeight: 0 }} />
+          <ListCheckbox theme='outline' size='14' className='block leading-none shrink-0' style={{ lineHeight: 0 }} />
         </div>
       </Tooltip>
     </div>

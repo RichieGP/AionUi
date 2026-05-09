@@ -267,6 +267,7 @@ const CronJobSiderItem: React.FC<CronJobSiderItemProps> = ({
           checked={false}
           selected={currentConversationId === conv.id}
           menuVisible={dropdownVisibleId === conv.id}
+          dimIcon
           onToggleChecked={() => {}}
           onConversationClick={handleConversationClick}
           onOpenMenu={handleOpenMenu}
@@ -299,7 +300,9 @@ const CronJobSiderItem: React.FC<CronJobSiderItemProps> = ({
       <div
         className={classNames(
           'group flex items-center gap-8px h-34px pl-10px pr-8px rd-8px transition-colors min-w-0',
-          pathname === `/scheduled/${job.id}` ? 'bg-fill-3' : 'hover:bg-fill-3 active:bg-fill-4'
+          pathname === `/scheduled/${job.id}`
+            ? 'bg-fill-3 [&_.cron-job-name]:text-t-primary'
+            : 'hover:bg-fill-3 active:bg-fill-4'
         )}
       >
         {/* Expand/collapse arrow — fixed 28px column to align with sibling rows' icons */}
@@ -325,7 +328,9 @@ const CronJobSiderItem: React.FC<CronJobSiderItemProps> = ({
           onClick={() => onNavigate(`/scheduled/${job.id}`)}
         >
           <div className='flex items-center gap-8px min-w-0'>
-            <span className='text-14px truncate flex-1 text-t-primary min-w-0 font-normal'>{job.name}</span>
+            <span className='cron-job-name text-14px truncate flex-1 text-[var(--color-text-2)] group-hover:text-t-primary transition-colors min-w-0 font-normal'>
+              {job.name}
+            </span>
           </div>
         </div>
       </div>
@@ -333,7 +338,7 @@ const CronJobSiderItem: React.FC<CronJobSiderItemProps> = ({
       {/* Child conversations — workspace groups + plain conversations */}
       {expanded && hasChildren && (
         <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
-          <div className='pl-30px'>
+          <div>
             <div className='flex flex-col gap-2px min-w-0 mt-2px'>
               {/* Workspace-grouped conversations */}
               {[...workspaceGroups.entries()].map(([ws, convs]) => (
@@ -344,7 +349,7 @@ const CronJobSiderItem: React.FC<CronJobSiderItemProps> = ({
                   siderCollapsed={false}
                   header={
                     <div className='flex items-center gap-8px min-w-0'>
-                      <span className='text-14px font-normal truncate flex-1 text-t-primary min-w-0'>
+                      <span className='text-14px font-normal truncate flex-1 text-[var(--color-text-2)] group-hover:text-t-primary transition-colors min-w-0'>
                         {getWorkspaceDisplayName(ws)}
                       </span>
                     </div>

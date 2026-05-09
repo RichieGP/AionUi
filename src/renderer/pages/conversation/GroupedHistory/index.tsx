@@ -11,7 +11,7 @@ import { DndContext, DragOverlay, closestCenter } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { Button, Dropdown, Empty, Input, Menu, Modal } from '@arco-design/web-react';
 import AionModal from '@/renderer/components/base/AionModal';
-import { Delete, FolderOpen, More, Right } from '@icon-park/react';
+import { Delete, FolderOpen, Right } from '@icon-park/react';
 import classNames from 'classnames';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -50,21 +50,11 @@ const WorkspaceGroupedHistory: React.FC<WorkspaceGroupedHistoryProps> = ({
   }, []);
 
   const SectionLabel = useCallback(
-    ({
-      sectionKey,
-      label,
-      trailing,
-    }: {
-      sectionKey: string;
-      label: string;
-      trailing?: React.ReactNode;
-    }) => {
+    ({ sectionKey, label, trailing }: { sectionKey: string; label: string; trailing?: React.ReactNode }) => {
       const isCollapsed = collapsedSections.has(sectionKey);
       return (
         <div className='group/label flex items-center px-12px h-28px select-none sticky top-0 z-10 bg-fill-2 mt-4px'>
-          <span className='text-12px text-t-tertiary font-normal leading-none'>
-            {label}
-          </span>
+          <span className='text-12px text-t-tertiary font-normal leading-none'>{label}</span>
           <span
             className='ml-2px flex items-center justify-center cursor-pointer opacity-0 group-hover/label:opacity-100 transition-opacity text-t-tertiary shrink-0'
             onClick={() => toggleSection(sectionKey)}
@@ -497,9 +487,7 @@ const WorkspaceGroupedHistory: React.FC<WorkspaceGroupedHistoryProps> = ({
         >
           {pinnedConversations.length > 0 && (
             <div className='min-w-0'>
-              {!collapsed && (
-                <SectionLabel sectionKey='pinned' label={t('conversation.history.pinnedSection')} />
-              )}
+              {!collapsed && <SectionLabel sectionKey='pinned' label={t('conversation.history.pinnedSection')} />}
               {!collapsedSections.has('pinned') && (
                 <SortableContext items={pinnedIds} strategy={verticalListSortingStrategy}>
                   <div className='min-w-0'>
@@ -533,7 +521,8 @@ const WorkspaceGroupedHistory: React.FC<WorkspaceGroupedHistoryProps> = ({
                 label={t('conversation.history.projectsSection', { defaultValue: '项目' })}
               />
             )}
-            {!collapsedSections.has('projects') && projectGroups.map((group) => {
+            {!collapsedSections.has('projects') &&
+              projectGroups.map((group) => {
                 const projectMenu = (
                   <Menu
                     onClickMenuItem={(key) => {
@@ -557,7 +546,9 @@ const WorkspaceGroupedHistory: React.FC<WorkspaceGroupedHistoryProps> = ({
                       onToggle={() => handleToggleWorkspace(group.workspace)}
                       siderCollapsed={collapsed}
                       header={
-                        <span className='text-14px font-normal truncate flex-1 text-t-primary min-w-0'>{group.displayName}</span>
+                        <span className='text-14px font-normal truncate flex-1 text-[var(--color-text-2)] group-hover:text-t-primary transition-colors min-w-0'>
+                          {group.displayName}
+                        </span>
                       }
                       trailing={
                         <Dropdown
@@ -569,10 +560,14 @@ const WorkspaceGroupedHistory: React.FC<WorkspaceGroupedHistoryProps> = ({
                         >
                           <span
                             aria-label='Project actions'
-                            className='hidden group-hover:flex flex-center cursor-pointer hover:bg-fill-2 rd-4px p-4px transition-colors text-t-primary'
+                            className='hidden group-hover:flex flex-center cursor-pointer transition-colors text-t-secondary hover:text-t-primary size-20px'
                             onClick={(e) => e.stopPropagation()}
                           >
-                            <More theme='outline' size={16} fill='currentColor' style={{ lineHeight: 0 }} />
+                            <span className='flex flex-col gap-2px items-center justify-center'>
+                              <span className='w-2px h-2px rounded-full bg-current' />
+                              <span className='w-2px h-2px rounded-full bg-current' />
+                              <span className='w-2px h-2px rounded-full bg-current' />
+                            </span>
                           </span>
                         </Dropdown>
                       }
