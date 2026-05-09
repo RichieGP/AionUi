@@ -1,9 +1,29 @@
 /* Layout-level styles: sidebar, sider animations, message positioning */
 
 :root {
-  --sider-chrome-menu-offset: 62px;
-  --sider-chrome-toggle-left: 78px;
-  --sider-chrome-toggle-top: 10px;
+  /* macOS traffic lights span x=16..~74 with hit-areas extending a few px beyond the visible dots.
+   * Reserve ≥86px before the first interactive control so clicks aren't swallowed by the
+   * window-drag region around the close/min/zoom buttons. */
+  --sider-chrome-menu-offset: 78px;
+  --sider-chrome-toggle-left: 90px;
+  --sider-chrome-toggle-top: 14px;
+}
+
+/* Top-of-content drag strip — lets users drag the window from any page's blank header area.
+ * Starts AFTER the floating sider-expand button slot to not steal its clicks.
+ * pointer-events:none keeps clicks falling through to other interactive elements,
+ * while -webkit-app-region:drag is a Chromium hit-test that still works. */
+.layout-content-drag-strip {
+  position: absolute;
+  /* Start well clear of the floating sider-expand button (left:90, w:32 → ends at 122).
+   * Extra 50px buffer so Electron's drag hit-test never overlaps the button. */
+  top: 0;
+  left: 180px;
+  right: 0;
+  height: 36px;
+  z-index: 1;
+  -webkit-app-region: drag;
+  pointer-events: none;
 }
 
 /* Floating expand button shown when sider is fully collapsed on desktop */

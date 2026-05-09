@@ -20,6 +20,7 @@ import { dispatchWorkspaceToggleEvent } from '@/renderer/utils/workspace/workspa
 import { ACP_BACKENDS_ALL } from '@/common/types/acpTypes';
 import classNames from 'classnames';
 import { isMacEnvironment, isWindowsEnvironment } from '@/renderer/pages/conversation/utils/detectPlatform';
+import { isElectronDesktop } from '@/renderer/utils/platform';
 import {
   MIN_WORKSPACE_RATIO,
   WORKSPACE_HEADER_HEIGHT,
@@ -182,7 +183,10 @@ const ChatLayout: React.FC<{
       <ArcoLayout.Header
         className={classNames(
           'flex items-center justify-between gap-8px !bg-1 chat-layout-header chat-layout-header--glass overflow-hidden',
-          layout?.isMobile ? 'min-h-44px px-16px pt-8px pb-10px chat-layout-header--mobile-unified' : 'pl-8px pr-20px py-16px'
+          layout?.isMobile
+            ? 'min-h-44px px-16px pt-8px pb-10px chat-layout-header--mobile-unified'
+            : 'pl-8px pr-20px py-16px',
+          isDesktop && isElectronDesktop() && 'chat-layout-header--draggable'
         )}
         style={headerPaddingLeft ? { paddingLeft: headerPaddingLeft } : undefined}
       >
@@ -278,9 +282,7 @@ const ChatLayout: React.FC<{
               >
                 {!rightSiderCollapsed &&
                   createWorkspaceDragHandle({ className: 'absolute left-0 top-0 bottom-0', style: {}, reverse: true })}
-                <ArcoLayout.Content className='h-full !bg-transparent'>
-                  {props.sider}
-                </ArcoLayout.Content>
+                <ArcoLayout.Content className='h-full !bg-transparent'>{props.sider}</ArcoLayout.Content>
               </div>
             </div>
           )}
@@ -416,9 +418,7 @@ const ChatLayout: React.FC<{
               {isDesktop &&
                 !rightSiderCollapsed &&
                 createWorkspaceDragHandle({ className: 'absolute left-0 top-0 bottom-0', style: {}, reverse: true })}
-              <ArcoLayout.Content className='h-full !bg-transparent'>
-                {props.sider}
-              </ArcoLayout.Content>
+              <ArcoLayout.Content className='h-full !bg-transparent'>{props.sider}</ArcoLayout.Content>
             </div>
           </div>
         )}
@@ -435,7 +435,6 @@ const ChatLayout: React.FC<{
             workspacePath={workspacePath}
           />
         )}
-
       </div>
     </ArcoLayout>
   );

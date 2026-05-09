@@ -1,5 +1,28 @@
 /* Chat layout header styles */
 
+/* Desktop: header blank area drags the window; interactive children opt out */
+.chat-layout-header--draggable {
+  -webkit-app-region: drag;
+}
+
+.chat-layout-header--draggable button,
+.chat-layout-header--draggable input,
+.chat-layout-header--draggable a,
+.chat-layout-header--draggable [role='button'],
+.chat-layout-header--draggable [tabindex],
+.chat-layout-header--draggable [data-popover-trigger],
+.chat-layout-header--draggable .arco-btn,
+.chat-layout-header--draggable .arco-select,
+.chat-layout-header--draggable .arco-dropdown-trigger {
+  -webkit-app-region: no-drag;
+}
+
+/* Title editor and AgentBadge are divs with click handlers — opt out of drag */
+.chat-layout-header--draggable .chat-title-editor,
+.chat-layout-header--draggable [data-testid='agent-badge'] {
+  -webkit-app-region: no-drag;
+}
+
 .chat-layout-header--mobile-unified {
   height: 46px !important;
   min-height: 46px;
@@ -12,35 +35,24 @@
 .chat-layout-header--glass {
   position: relative;
   isolation: isolate;
-  contain: paint;
-  background-color: color-mix(in srgb, var(--bg-1) 92%, transparent) !important;
+  background-color: var(--bg-1) !important;
 }
 
+/* Simulate Claude-style "content fades behind header" with a fade band below the header.
+ * The band starts fully opaque (matching header bg) and fades to transparent,
+ * making upward-scrolling content visually dissolve into the header. */
 .chat-layout-header--glass::after {
   content: '';
   position: absolute;
   left: 0;
   right: 0;
-  bottom: -12px;
-  height: 12px;
+  bottom: -20px;
+  height: 20px;
   pointer-events: none;
-  background: linear-gradient(180deg, color-mix(in srgb, var(--bg-1) 68%, transparent) 0%, transparent 100%);
+  background: linear-gradient(180deg, var(--bg-1) 0%, transparent 100%);
 }
 
-@supports ((-webkit-backdrop-filter: blur(6px)) or (backdrop-filter: blur(6px))) {
-  .chat-layout-header--glass {
-    -webkit-backdrop-filter: saturate(110%) blur(6px);
-    backdrop-filter: saturate(110%) blur(6px);
-  }
-}
-
-@media (prefers-reduced-motion: reduce), (max-width: 768px) {
-  .chat-layout-header--glass {
-    -webkit-backdrop-filter: none;
-    backdrop-filter: none;
-    background-color: var(--bg-1) !important;
-  }
-
+@media (max-width: 768px) {
   .chat-layout-header--glass::after {
     display: none;
   }

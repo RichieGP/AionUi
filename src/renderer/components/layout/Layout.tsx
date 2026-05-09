@@ -529,6 +529,8 @@ const Layout: React.FC<{
                   : undefined
               }
             >
+              {!isMobile && isElectronDesktop() && <div className='layout-content-drag-strip' aria-hidden='true' />}
+              <Outlet />
               {!isMobile && collapsed && (
                 <button
                   type='button'
@@ -539,7 +541,6 @@ const Layout: React.FC<{
                   <SidebarToggleIcon size='16' />
                 </button>
               )}
-              <Outlet />
               {multiAgentContextHolder}
               {directorySelectionContextHolder}
               <PwaPullToRefresh />
