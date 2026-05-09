@@ -11,11 +11,11 @@ import { DndContext, DragOverlay, closestCenter } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { Button, Dropdown, Empty, Input, Menu, Modal } from '@arco-design/web-react';
 import AionModal from '@/renderer/components/base/AionModal';
-import { Delete, FolderOpen, Right } from '@icon-park/react';
+import { Delete, FolderOpen, Plus, Right } from '@icon-park/react';
 import classNames from 'classnames';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useParams } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 
 import WorkspaceCollapse from '../components/WorkspaceCollapse';
 import ConversationRow from './ConversationRow';
@@ -38,6 +38,7 @@ const WorkspaceGroupedHistory: React.FC<WorkspaceGroupedHistoryProps> = ({
 }) => {
   const { id } = useParams();
   const { t } = useTranslation();
+  const navigate = useNavigate();
   const { getJobStatus, markAsRead, setActiveConversation } = useCronJobsMap();
 
   const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set());
@@ -551,25 +552,51 @@ const WorkspaceGroupedHistory: React.FC<WorkspaceGroupedHistoryProps> = ({
                         </span>
                       }
                       trailing={
-                        <Dropdown
-                          droplist={projectMenu}
-                          trigger='click'
-                          position='br'
-                          getPopupContainer={() => document.body}
-                          unmountOnExit={false}
-                        >
+                        <span className='flex items-center gap-2px'>
                           <span
-                            aria-label='Project actions'
-                            className='hidden group-hover:flex flex-center cursor-pointer transition-colors text-t-secondary hover:text-t-primary size-20px'
-                            onClick={(e) => e.stopPropagation()}
+                            role='button'
+                            tabIndex={0}
+                            aria-label={t('conversation.history.newConversationInProject', {
+                              defaultValue: 'New conversation in this project',
+                            })}
+                            title={t('conversation.history.newConversationInProject', {
+                              defaultValue: 'New conversation in this project',
+                            })}
+                            className='hidden group-hover:flex flex-center cursor-pointer transition-colors text-t-secondary hover:text-t-primary size-20px rd-4px hover:bg-fill-3'
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              void navigate('/guid', { state: { workspace: group.workspace } });
+                            }}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter' || e.key === ' ') {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                void navigate('/guid', { state: { workspace: group.workspace } });
+                              }
+                            }}
                           >
-                            <span className='flex flex-col gap-2px items-center justify-center'>
-                              <span className='w-2px h-2px rounded-full bg-current' />
-                              <span className='w-2px h-2px rounded-full bg-current' />
-                              <span className='w-2px h-2px rounded-full bg-current' />
-                            </span>
+                            <Plus theme='outline' size='14' fill='currentColor' />
                           </span>
-                        </Dropdown>
+                          <Dropdown
+                            droplist={projectMenu}
+                            trigger='click'
+                            position='br'
+                            getPopupContainer={() => document.body}
+                            unmountOnExit={false}
+                          >
+                            <span
+                              aria-label='Project actions'
+                              className='hidden group-hover:flex flex-center cursor-pointer transition-colors text-t-secondary hover:text-t-primary size-20px'
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <span className='flex flex-col gap-2px items-center justify-center'>
+                                <span className='w-2px h-2px rounded-full bg-current' />
+                                <span className='w-2px h-2px rounded-full bg-current' />
+                                <span className='w-2px h-2px rounded-full bg-current' />
+                              </span>
+                            </span>
+                          </Dropdown>
+                        </span>
                       }
                     >
                       <div className={classNames('flex flex-col min-w-0', { 'mt-1px': !collapsed })}>
