@@ -190,9 +190,16 @@ const ChatLayout: React.FC<{
         )}
         style={headerPaddingLeft ? { paddingLeft: headerPaddingLeft } : undefined}
       >
-        <div className='shrink-0 flex items-center gap-8px'>{props.headerLeft}</div>
+        <div
+          className={classNames('shrink-0 flex items-center gap-8px', {
+            // Reserve space for the floating Layout hamburger button on mobile (sits at left:12, w:36)
+            'pl-44px': layout?.isMobile && !props.headerLeft,
+          })}
+        >
+          {props.headerLeft}
+        </div>
         <FlexFullContainer className='h-full min-w-0' containerClassName='flex items-center gap-16px'>
-          {!layout?.isMobile && !hasTabs && (
+          {!hasTabs && (
             <ChatTitleEditor
               editingTitle={editingTitle}
               titleDraft={titleDraft}
@@ -206,7 +213,7 @@ const ChatLayout: React.FC<{
               conversationId={conversationId}
             />
           )}
-          {(hasTabs || layout?.isMobile) && <ConversationTitleMinimap conversationId={conversationId} hideTrigger />}
+          {hasTabs && <ConversationTitleMinimap conversationId={conversationId} hideTrigger />}
         </FlexFullContainer>
         <div className='flex items-center gap-9px shrink-0'>
           {props.headerExtra}
@@ -219,7 +226,7 @@ const ChatLayout: React.FC<{
               assistantId={presetAssistant?.id}
             />
           )}
-          {isDesktop && workspaceEnabled && (
+          {workspaceEnabled && (
             <button
               type='button'
               className='chat-layout-header__workspace-toggle'

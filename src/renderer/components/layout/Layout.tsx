@@ -11,7 +11,6 @@ import PwaPullToRefresh from '@/renderer/components/layout/PwaPullToRefresh';
 import SidebarToggleIcon from '@/renderer/components/layout/SidebarToggleIcon';
 import Titlebar from '@/renderer/components/layout/Titlebar';
 import { Layout as ArcoLayout } from '@arco-design/web-react';
-import { MenuFold, MenuUnfold } from '@icon-park/react';
 import classNames from 'classnames';
 import React, { Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
@@ -478,20 +477,6 @@ const Layout: React.FC<{
                   </svg>
                 </div>
                 <div className='text-16px text-t-primary collapsed-hidden font-semibold'>AionUi</div>
-                {isMobile && !collapsed && (
-                  <button
-                    type='button'
-                    className='app-titlebar__button'
-                    onClick={() => setCollapsed(true)}
-                    aria-label='Collapse sidebar'
-                  >
-                    {collapsed ? (
-                      <MenuUnfold theme='outline' size='18' fill='currentColor' />
-                    ) : (
-                      <MenuFold theme='outline' size='18' fill='currentColor' />
-                    )}
-                  </button>
-                )}
               </ArcoLayout.Header>
               <ArcoLayout.Content className='pt-0 px-8px pb-0 layout-sider-content'>
                 {React.isValidElement(sider)
@@ -531,14 +516,14 @@ const Layout: React.FC<{
             >
               {!isMobile && isElectronDesktop() && <div className='layout-content-drag-strip' aria-hidden='true' />}
               <Outlet />
-              {!isMobile && collapsed && (
+              {collapsed && (
                 <button
                   type='button'
-                  className='layout-sider-expand-btn'
+                  className={classNames('layout-sider-expand-btn', isMobile && 'layout-sider-expand-btn--mobile')}
                   onClick={() => setCollapsed(false)}
                   aria-label='Expand sidebar'
                 >
-                  <SidebarToggleIcon size='16' />
+                  <SidebarToggleIcon size={isMobile ? 16 : 18} />
                 </button>
               )}
               {multiAgentContextHolder}

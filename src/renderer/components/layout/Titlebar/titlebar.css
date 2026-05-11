@@ -157,8 +157,7 @@
 
 .app-titlebar--mac .app-titlebar__menu {
   height: 32px;
-  align-self: flex-start;
-  margin-top: 2px;
+  align-self: center;
 }
 
 .app-titlebar__toolbar {
@@ -244,14 +243,14 @@
 }
 
 .app-titlebar__button--mobile {
-  width: 48px;
-  height: 48px;
-  border-radius: 12px;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
 }
 
 .app-titlebar__button--mobile svg {
-  width: 24px !important;
-  height: 24px !important;
+  width: 16px !important;
+  height: 16px !important;
 }
 
 .app-window-controls {

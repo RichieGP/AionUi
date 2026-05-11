@@ -5,7 +5,7 @@ type SidebarToggleIconProps = {
   strokeWidth?: number;
 };
 
-const SidebarToggleIcon: React.FC<SidebarToggleIconProps> = ({ size = 18, strokeWidth = 3.4 }) => (
+const SidebarToggleIcon: React.FC<SidebarToggleIconProps> = ({ size = 18, strokeWidth = 2.5 }) => (
   <svg
     width={size}
     height={size}

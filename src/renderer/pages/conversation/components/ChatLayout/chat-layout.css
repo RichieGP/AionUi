@@ -78,6 +78,24 @@
   background-color: var(--bg-3);
 }
 
+/* Mobile: workspace toggle reverts to a plain icon button so it matches the
+ * other top-bar icons (hamburger, alarm, agent badge) in color and weight. */
+@media (max-width: 767px) {
+  .chat-layout-header__workspace-toggle {
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    background-color: transparent;
+    color: var(--text-secondary);
+    border-radius: 8px;
+  }
+
+  .chat-layout-header__workspace-toggle:hover {
+    background-color: var(--fill-1);
+    color: var(--text-primary);
+  }
+}
+
 /* Workspace open button dropdown styles */
 .workspace-open-dropdown {
   background-color: var(--color-bg-2);
