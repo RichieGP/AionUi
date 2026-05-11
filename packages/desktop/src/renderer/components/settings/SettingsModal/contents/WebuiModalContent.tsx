@@ -106,18 +106,30 @@ const WebuiModalContent: React.FC = () => {
   const loadStatus = useCallback(async () => {
     setLoading(true);
     try {
-      const savedEnabled = configService.get(DESKTOP_WEBUI_ENABLED_KEY) ?? false;
       const savedAllowRemote = configService.get(DESKTOP_WEBUI_ALLOW_REMOTE_KEY) ?? false;
-      setWebuiEnabled(savedEnabled === true);
       setAllowRemotePreference(savedAllowRemote === true);
 
       // getStatus goes via IPC to the Electron main process which tracks the
       // WebUI lifecycle; backend does not know it's being wrapped.
-      const timeoutPromise = new Promise<null>((resolve) => setTimeout(() => resolve(null), 1500));
-      const statusData: IWebUIStatus | null = await Promise.race([webui.getStatus.invoke(), timeoutPromise]);
+      const statusData: IWebUIStatus | null = await webui.getStatus.invoke();
 
       if (statusData) {
         setStatus(statusData);
+        // Switch must track the *real* server state, not the persisted
+        // preference. Reading `webui.desktop.enabled` from config and using it
+        // as the Switch's checked value used to make the Switch look "on" when
+        // the main-process auto-restore silently failed (port conflict, etc.),
+        // so users clicked the saved URL and got a white screen because 25808
+        // was empty.
+        setWebuiEnabled(statusData.running);
+
+        // Persisted preference disagrees with reality → reconcile the config
+        // so next launch's auto-restore matches what the user sees now.
+        const savedEnabled = configService.get(DESKTOP_WEBUI_ENABLED_KEY) === true;
+        if (savedEnabled !== statusData.running) {
+          void configService.set(DESKTOP_WEBUI_ENABLED_KEY, statusData.running);
+        }
+
         if (statusData.lanIP) {
           setCachedIP(statusData.lanIP);
         } else if (statusData.networkUrl) {
@@ -134,6 +146,9 @@ const WebuiModalContent: React.FC = () => {
         // 注意：如果 running 但没有密码，会在下面的 useEffect 中自动重置
         // Note: If running but no password, auto-reset will be triggered in the useEffect below
       } else {
+        // getStatus failed — fall back to treating server as stopped rather
+        // than believing a possibly-stale config flag.
+        setWebuiEnabled(false);
         setStatus(
           (prev) =>
             prev || {
@@ -147,6 +162,7 @@ const WebuiModalContent: React.FC = () => {
       }
     } catch (error) {
       console.error('[WebuiModal] Failed to load WebUI status:', error);
+      setWebuiEnabled(false);
     } finally {
       setLoading(false);
     }
@@ -159,6 +175,10 @@ const WebuiModalContent: React.FC = () => {
   // 监听状态变更事件 / Listen to status change events
   useEffect(() => {
     const unsubscribe = webui.statusChanged.on((data) => {
+      // Keep the Switch checkbox in lock-step with the actual server state so
+      // a main-process auto-restore (or external stop) is reflected in the UI
+      // without a page reload.
+      setWebuiEnabled(data.running === true);
       if (data.running) {
         setStatus((prev) => ({
           ...(prev || { adminUsername: 'admin' }),
