@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Button, Form, Input, Message } from '@arco-design/web-react';
 import type { RefInputType } from '@arco-design/web-react/es/Input/interface';
-import { Close, Search, Flag } from '@icon-park/react';
+import { Close, Search } from '@icon-park/react';
 import { useTranslation } from 'react-i18next';
 import { ipcBridge } from '@/common';
 import type { TTeam, TeamAgent } from '@/common/types/team/teamTypes';
@@ -33,31 +33,27 @@ type Props = {
   onCreated: (team: TTeam) => void;
 };
 
-const AgentListItem: React.FC<{
+const AgentRadioRow: React.FC<{
   agent: TeamAgentOption;
   isSelected: boolean;
   onClick: () => void;
 }> = ({ agent, isSelected, onClick }) => (
   <div
-    className={`flex cursor-pointer items-center gap-10px rounded-10px px-12px py-10px transition-colors ${
-      isSelected ? 'bg-fill-2' : 'hover:bg-fill-1'
+    className={`flex cursor-pointer items-center gap-12px rounded-8px px-12px py-9px transition-colors ${
+      isSelected ? 'bg-primary-1' : 'hover:bg-fill-2'
     }`}
     onClick={onClick}
     data-testid={`team-create-agent-option-${agentKey(agent)}`}
   >
+    <div
+      className='flex h-16px w-16px flex-shrink-0 items-center justify-center rounded-full border border-solid transition-all'
+      style={{
+        borderColor: isSelected ? 'rgb(var(--primary-6))' : 'var(--color-border-3)',
+        borderWidth: isSelected ? 5 : 1.5,
+      }}
+    />
     <div className='flex-1 overflow-hidden'>
       <AgentOptionLabel agent={agent} />
-    </div>
-    <div
-      className={`flex h-20px w-20px flex-shrink-0 items-center justify-center rounded-full border-2 transition-all ${
-        isSelected ? 'border-primary-6 bg-primary-6' : 'border-border-2 bg-transparent'
-      }`}
-    >
-      {isSelected && (
-        <svg width='10' height='8' viewBox='0 0 10 8' fill='none'>
-          <path d='M1 4L3.5 6.5L9 1' stroke='white' strokeWidth='1.5' strokeLinecap='round' strokeLinejoin='round' />
-        </svg>
-      )}
     </div>
   </div>
 );
@@ -113,8 +109,8 @@ const TeamCreateModal: React.FC<Props> = ({ visible, onClose, onCreated }) => {
     onClose();
   };
 
-  const handleToggleAgent = (key: string) => {
-    setLeaderKey((prev) => (prev === key ? undefined : key));
+  const handleSelectLeader = (key: string) => {
+    setLeaderKey(key);
   };
 
   const handleCreate = async () => {
@@ -175,14 +171,12 @@ const TeamCreateModal: React.FC<Props> = ({ visible, onClose, onCreated }) => {
     }
   };
 
-  const selectedLeader = leaderKey ? agentFromKey(leaderKey, allAgents) : undefined;
-
   return (
     <AionModal
       visible={visible}
       onCancel={handleClose}
       className='team-create-modal'
-      style={{ width: 720 }}
+      style={{ width: 560 }}
       wrapStyle={{ zIndex: 10000 }}
       maskStyle={{ zIndex: 9999 }}
       autoFocus={false}
@@ -194,26 +188,23 @@ const TeamCreateModal: React.FC<Props> = ({ visible, onClose, onCreated }) => {
       }}
       header={{
         render: () => (
-          <div className='flex items-center justify-between border-b border-border-1 bg-dialog-fill-0 px-24px py-18px'>
+          <div className='flex items-center justify-between border-b border-border-2 bg-dialog-fill-0 px-24px py-18px'>
             <div>
               <h3 className='m-0 text-16px font-600 text-t-primary'>
                 {t('team.create.title', { defaultValue: 'Create Team' })}
               </h3>
-              <p className='m-0 mt-2px text-12px text-t-tertiary'>
-                {t('team.create.subtitle', { defaultValue: 'Choose a leader agent to coordinate your team' })}
-              </p>
             </div>
             <Button
               type='text'
               icon={<Close size='18' fill='currentColor' className='text-t-secondary' />}
               onClick={handleClose}
-              className='!h-28px !w-28px !min-w-28px !p-0 !rd-8px hover:!bg-fill-1'
+              className='!h-28px !w-28px !min-w-28px !p-0 !rd-8px hover:!bg-fill-2'
             />
           </div>
         ),
       }}
       footer={
-        <div className='flex justify-end gap-10px border-t border-border-1 bg-dialog-fill-0 px-24px py-16px'>
+        <div className='flex justify-end gap-10px border-t border-border-2 bg-dialog-fill-0 px-24px py-16px'>
           <Button onClick={handleClose} className='min-w-80px' style={{ borderRadius: 8 }}>
             {t('common.cancel', { defaultValue: 'Cancel' })}
           </Button>
@@ -230,157 +221,139 @@ const TeamCreateModal: React.FC<Props> = ({ visible, onClose, onCreated }) => {
         </div>
       }
     >
-      {/* 左右分栏 */}
-      <div className='flex' style={{ height: 440 }}>
-        {/* 左侧：Agent 列表 */}
-        <div className='flex flex-col border-r border-border-1' style={{ width: 320, flexShrink: 0 }}>
-          {/* 搜索框 */}
-          <div className='px-12px pt-12px pb-8px'>
-            <div className='flex items-center gap-8px rounded-8px bg-fill-1 px-10px py-7px'>
-              <Search size='14' fill='currentColor' className='flex-shrink-0 text-t-tertiary' />
-              <input
-                className='flex-1 border-none bg-transparent text-13px text-t-primary outline-none placeholder:text-t-tertiary'
-                placeholder={t('team.create.searchPlaceholder', { defaultValue: 'Search agents...' })}
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-              />
-            </div>
-          </div>
+      <div className='px-24px py-20px' style={{ maxHeight: 'min(72vh, 640px)', overflowY: 'auto' }}>
+        <Form layout='vertical'>
+          {/* Team name */}
+          <FormItem
+            label={
+              <span className='text-12px font-500 text-t-secondary'>
+                {t('team.create.namePlaceholder', { defaultValue: 'Team name' })}
+                <span className='ml-4px text-danger-6'>*</span>
+              </span>
+            }
+          >
+            <Input
+              ref={nameInputRef}
+              placeholder={t('team.create.namePlaceholder', { defaultValue: 'Team name' })}
+              value={name}
+              onChange={setName}
+              data-testid='team-create-name-input'
+            />
+          </FormItem>
 
-          {/* Agent 列表 */}
-          <div className='flex-1 overflow-y-auto px-8px pb-8px'>
+          {/* Leader */}
+          <FormItem
+            label={
+              <div className='flex flex-col gap-2px'>
+                <span className='text-12px font-500 text-t-secondary'>
+                  {t('team.create.step.dispatch', { defaultValue: 'Team Leader' })}
+                  <span className='ml-4px text-danger-6'>*</span>
+                </span>
+                <span className='text-11px font-normal leading-16px text-t-tertiary'>
+                  {t('team.create.leaderDesc', {
+                    defaultValue: 'Receives your instructions and spawns teammates as needed during the conversation',
+                  })}
+                </span>
+              </div>
+            }
+          >
             {allAgents.length === 0 ? (
-              <div className='flex h-full items-center justify-center text-12px text-t-tertiary'>
+              <div className='flex items-center justify-center rounded-10px border border-dashed border-border-2 bg-fill-1 py-20px text-12px text-t-tertiary'>
                 {t('team.create.noSupportedAgents', { defaultValue: 'No supported agents installed' })}
               </div>
-            ) : filteredAgents.length === 0 ? (
-              <div className='flex h-full items-center justify-center text-12px text-t-tertiary'>
-                {t('team.create.noSearchResults', { defaultValue: 'No results found' })}
-              </div>
             ) : (
-              <>
-                {filteredCliAgents.length > 0 && (
-                  <div>
-                    <div className='px-12px py-6px text-11px font-500 uppercase tracking-wider text-t-tertiary'>
-                      {t('conversation.dropdown.cliAgents', { defaultValue: 'CLI Agents' })}
-                    </div>
-                    {filteredCliAgents.map((agent) => {
-                      const key = agentKey(agent);
-                      return (
-                        <AgentListItem
-                          key={key}
-                          agent={agent}
-                          isSelected={leaderKey === key}
-                          onClick={() => handleToggleAgent(key)}
-                        />
-                      );
-                    })}
+              <div className='rounded-12px border border-border-2 bg-fill-1'>
+                {/* 搜索框 */}
+                <div className='border-b border-border-2 px-12px py-8px'>
+                  <div className='flex items-center gap-8px'>
+                    <Search size='14' fill='currentColor' className='flex-shrink-0 text-t-tertiary' />
+                    <input
+                      className='flex-1 border-none bg-transparent text-13px text-t-primary outline-none placeholder:text-t-tertiary'
+                      placeholder={t('team.create.searchPlaceholder', { defaultValue: 'Search agents...' })}
+                      value={search}
+                      onChange={(e) => setSearch(e.target.value)}
+                    />
                   </div>
-                )}
-                {filteredPresetAssistants.length > 0 && (
-                  <div className={filteredCliAgents.length > 0 ? 'mt-4px' : ''}>
-                    <div className='px-12px py-6px text-11px font-500 uppercase tracking-wider text-t-tertiary'>
-                      {t('conversation.dropdown.presetAssistants', { defaultValue: 'Preset Assistants' })}
-                    </div>
-                    {filteredPresetAssistants.map((agent) => {
-                      const key = agentKey(agent);
-                      return (
-                        <AgentListItem
-                          key={key}
-                          agent={agent}
-                          isSelected={leaderKey === key}
-                          onClick={() => handleToggleAgent(key)}
-                        />
-                      );
-                    })}
-                  </div>
-                )}
-              </>
-            )}
-          </div>
-        </div>
+                </div>
 
-        {/* 右侧：已选 Leader + 表单 */}
-        <div className='flex flex-1 flex-col overflow-y-auto'>
-          {/* 已选 Leader 区域 */}
-          <div className='border-b border-border-1 px-20px py-14px'>
-            <div className='mb-8px flex items-center justify-between'>
+                {/* 列表 */}
+                <div className='max-h-240px overflow-y-auto p-6px'>
+                  {filteredAgents.length === 0 ? (
+                    <div className='flex items-center justify-center py-20px text-12px text-t-tertiary'>
+                      {t('team.create.noSearchResults', { defaultValue: 'No results found' })}
+                    </div>
+                  ) : (
+                    <>
+                      {filteredCliAgents.length > 0 && (
+                        <div>
+                          <div className='px-12px py-6px text-11px font-500 uppercase tracking-wider text-t-tertiary'>
+                            {t('conversation.dropdown.cliAgents', { defaultValue: 'CLI Agents' })}
+                          </div>
+                          {filteredCliAgents.map((agent) => {
+                            const key = agentKey(agent);
+                            return (
+                              <AgentRadioRow
+                                key={key}
+                                agent={agent}
+                                isSelected={leaderKey === key}
+                                onClick={() => handleSelectLeader(key)}
+                              />
+                            );
+                          })}
+                        </div>
+                      )}
+                      {filteredPresetAssistants.length > 0 && (
+                        <div className={filteredCliAgents.length > 0 ? 'mt-4px' : ''}>
+                          <div className='px-12px py-6px text-11px font-500 uppercase tracking-wider text-t-tertiary'>
+                            {t('conversation.dropdown.presetAssistants', { defaultValue: 'Preset Assistants' })}
+                          </div>
+                          {filteredPresetAssistants.map((agent) => {
+                            const key = agentKey(agent);
+                            return (
+                              <AgentRadioRow
+                                key={key}
+                                agent={agent}
+                                isSelected={leaderKey === key}
+                                onClick={() => handleSelectLeader(key)}
+                              />
+                            );
+                          })}
+                        </div>
+                      )}
+                    </>
+                  )}
+                </div>
+              </div>
+            )}
+          </FormItem>
+
+          {/* Project / Workspace */}
+          <FormItem
+            label={
               <span className='text-12px font-500 text-t-secondary'>
-                {t('team.create.step.dispatch', { defaultValue: 'Team Leader' })}
-              </span>
-              {selectedLeader && (
-                <span className='flex items-center gap-4px text-11px text-primary-6'>
-                  <Flag size='12' fill='currentColor' />
-                  {t('team.create.leaderSelected', { defaultValue: 'Selected' })}
+                {t('team.create.step.workspace', { defaultValue: 'Project' })}
+                <span className='ml-4px text-11px font-normal text-t-tertiary'>
+                  {t('common.optional', { defaultValue: '(optional)' })}
                 </span>
-              )}
-            </div>
-
-            {selectedLeader ? (
-              <div className='flex items-center justify-between rounded-10px border border-border-1 bg-fill-1 px-12px py-10px'>
-                <AgentOptionLabel agent={selectedLeader} />
-                <Button
-                  type='text'
-                  icon={<Close size='14' fill='currentColor' />}
-                  onClick={() => setLeaderKey(undefined)}
-                  className='!h-20px !w-20px !min-w-20px !p-0 !rd-6px text-t-tertiary hover:!bg-fill-2 hover:!text-t-secondary'
-                />
-              </div>
-            ) : (
-              <div className='flex items-center justify-center rounded-10px border border-dashed border-border-2 py-16px text-12px text-t-tertiary'>
-                {t('team.create.leaderDesc', { defaultValue: 'Select a leader from the left' })}
-              </div>
-            )}
-          </div>
-
-          {/* 表单区域 */}
-          <div className='flex-1 px-20px py-16px'>
-            <Form layout='vertical'>
-              <FormItem
-                label={
-                  <span className='text-12px font-500 text-t-secondary'>
-                    {t('team.create.namePlaceholder', { defaultValue: 'Team name' })}
-                    <span className='ml-4px text-danger-6'>*</span>
-                  </span>
-                }
-              >
-                <Input
-                  ref={nameInputRef}
-                  placeholder={t('team.create.namePlaceholder', { defaultValue: 'Team name' })}
-                  value={name}
-                  onChange={setName}
-                  data-testid='team-create-name-input'
-                />
-              </FormItem>
-
-              <FormItem
-                label={
-                  <span className='text-12px font-500 text-t-secondary'>
-                    {t('team.create.step.workspace', { defaultValue: 'Project' })}
-                    <span className='ml-4px text-11px font-normal text-t-tertiary'>
-                      {t('common.optional', { defaultValue: '(optional)' })}
-                    </span>
-                  </span>
-                }
-              >
-                <WorkspaceFolderSelect
-                  value={workspace}
-                  onChange={setWorkspace}
-                  placeholder={t('team.create.selectFolder', { defaultValue: 'Select folder' })}
-                  input_placeholder={t('team.create.workspacePlaceholder', {
-                    defaultValue: 'Project folder path (optional)',
-                  })}
-                  recentLabel={t('team.create.recentLabel', { defaultValue: 'Recent' })}
-                  chooseDifferentLabel={t('team.create.chooseDifferentFolder', {
-                    defaultValue: 'Choose a different folder',
-                  })}
-                  triggerTestId='team-create-workspace-trigger'
-                  menuTestId='team-create-workspace-menu'
-                />
-              </FormItem>
-            </Form>
-          </div>
-        </div>
+              </span>
+            }
+          >
+            <WorkspaceFolderSelect
+              value={workspace}
+              onChange={setWorkspace}
+              placeholder={t('team.create.selectFolder', { defaultValue: 'Select folder' })}
+              input_placeholder={t('team.create.workspacePlaceholder', {
+                defaultValue: 'Project folder path (optional)',
+              })}
+              recentLabel={t('team.create.recentLabel', { defaultValue: 'Recent' })}
+              chooseDifferentLabel={t('team.create.chooseDifferentFolder', {
+                defaultValue: 'Choose a different folder',
+              })}
+              triggerTestId='team-create-workspace-trigger'
+              menuTestId='team-create-workspace-menu'
+            />
+          </FormItem>
+        </Form>
       </div>
     </AionModal>
   );
