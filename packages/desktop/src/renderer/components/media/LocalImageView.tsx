@@ -24,11 +24,15 @@ const LocalImageView: React.FC<{
   const { root, conversationId } = useLocalImage();
   const blobRef = useRef<{ conversationId: string; relativePath: string } | null>(null);
 
+  // "external" 的语义是：完全跳过 conversation 静态接口和 workspace 拼接，
+  // 比如 http(s)、data:、blob:、file:、Windows 盘符、Windows UNC 路径。
+  // 前导 `/` 不算 external —— agent 的 markdown 里 `/tmp/x.png` 这种写法表示
+  // "workspace 根相对"，应当去掉前导 `/` 后走 conversation 静态接口。
   const isAbsoluteOrExternal = useMemo(
     () =>
       src.startsWith('http') ||
       src.startsWith('data:') ||
-      src.startsWith('/') ||
+      src.startsWith('blob:') ||
       src.startsWith('file:') ||
       src.startsWith('\\') ||
       /^[A-Za-z]:/.test(src),
@@ -37,7 +41,8 @@ const LocalImageView: React.FC<{
 
   const relativePath = useMemo(() => {
     if (isAbsoluteOrExternal) return src;
-    return src;
+    // workspace 根相对：`/tmp/x.png` -> `tmp/x.png`
+    return src.startsWith('/') ? src.slice(1) : src;
   }, [src, isAbsoluteOrExternal]);
 
   const absolutePath = useMemo(() => {
