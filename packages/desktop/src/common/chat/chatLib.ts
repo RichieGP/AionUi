@@ -125,7 +125,25 @@ export type IMessageText = IMessage<
   }
 >;
 
-export type IMessageTips = IMessage<'tips', { content: string; type: 'error' | 'success' | 'warning' }>;
+export type AgentErrorOwnership = 'aionui' | 'user_agent' | 'user_llm_provider' | 'unknown_upstream';
+
+export type AgentStreamErrorInfo = {
+  message: string;
+  code?: string;
+  ownership?: AgentErrorOwnership;
+  detail?: string;
+  retryable?: boolean;
+  feedback_recommended?: boolean;
+};
+
+export type IMessageTips = IMessage<
+  'tips',
+  {
+    content: string;
+    type: 'error' | 'success' | 'warning';
+    error?: AgentStreamErrorInfo;
+  }
+>;
 
 export type IMessageToolCall = IMessage<
   'tool_call',
@@ -341,6 +359,44 @@ export interface IConfirmation<Option extends any = any> {
   command_type?: string;
 }
 
+const isObject = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null && !Array.isArray(value);
+
+const AGENT_ERROR_OWNERSHIPS = new Set<AgentErrorOwnership>([
+  'aionui',
+  'user_agent',
+  'user_llm_provider',
+  'unknown_upstream',
+]);
+
+export const normalizeAgentStreamError = (value: unknown): AgentStreamErrorInfo | undefined => {
+  if (!isObject(value) || typeof value.message !== 'string') {
+    return undefined;
+  }
+
+  const code = typeof value.code === 'string' ? value.code : undefined;
+  const ownership =
+    typeof value.ownership === 'string' && AGENT_ERROR_OWNERSHIPS.has(value.ownership as AgentErrorOwnership)
+      ? (value.ownership as AgentErrorOwnership)
+      : undefined;
+  const detail = typeof value.detail === 'string' ? value.detail : undefined;
+  const retryable = typeof value.retryable === 'boolean' ? value.retryable : undefined;
+  const feedback_recommended = typeof value.feedback_recommended === 'boolean' ? value.feedback_recommended : undefined;
+
+  if (!code && !ownership && !detail && retryable === undefined && feedback_recommended === undefined) {
+    return undefined;
+  }
+
+  return {
+    message: value.message,
+    ...(code ? { code } : {}),
+    ...(ownership ? { ownership } : {}),
+    ...(detail ? { detail } : {}),
+    ...(retryable !== undefined ? { retryable } : {}),
+    ...(feedback_recommended !== undefined ? { feedback_recommended } : {}),
+  };
+};
+
 /**
  * @description 将后端返回的消息转换为前端消息
  * */
@@ -349,6 +405,7 @@ export const transformMessage = (message: IResponseMessage): TMessage | undefine
   switch (message.type) {
     case 'error': {
       const errorData = message.data;
+      const structuredError = normalizeAgentStreamError(errorData);
       const errorText =
         typeof errorData === 'string'
           ? errorData
@@ -363,6 +420,7 @@ export const transformMessage = (message: IResponseMessage): TMessage | undefine
         content: {
           content: errorText,
           type: 'error',
+          ...(structuredError ? { error: structuredError } : {}),
         },
       };
     }

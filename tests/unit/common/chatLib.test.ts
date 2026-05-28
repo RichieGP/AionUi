@@ -9,6 +9,7 @@ import type { IResponseMessage } from '@/common/adapter/ipcBridge';
 import {
   composeMessage,
   transformMessage,
+  type IMessageTips,
   type IMessageAcpToolCall,
   type IMessageThinking,
   type TMessage,
@@ -110,5 +111,34 @@ describe('transformMessage', () => {
     };
 
     expect(transformMessage(message)).toBeUndefined();
+  });
+
+  it('preserves structured agent stream error metadata', () => {
+    const message: IResponseMessage = {
+      type: 'error',
+      data: {
+        message: 'The model provider rejected the request',
+        code: 'USER_LLM_PROVIDER_AUTH_FAILED',
+        ownership: 'user_llm_provider',
+        detail: 'Provider returned 401.',
+        retryable: false,
+        feedback_recommended: false,
+      },
+      msg_id: 'error-1',
+      conversation_id: CONVERSATION_ID,
+    };
+
+    const transformed = transformMessage(message) as IMessageTips;
+
+    expect(transformed.type).toBe('tips');
+    expect(transformed.content.content).toBe('The model provider rejected the request');
+    expect(transformed.content.error).toEqual({
+      message: 'The model provider rejected the request',
+      code: 'USER_LLM_PROVIDER_AUTH_FAILED',
+      ownership: 'user_llm_provider',
+      detail: 'Provider returned 401.',
+      retryable: false,
+      feedback_recommended: false,
+    });
   });
 });

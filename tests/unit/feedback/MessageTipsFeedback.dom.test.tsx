@@ -33,13 +33,17 @@ vi.mock('@renderer/components/Markdown', () => ({
 }));
 
 import MessageTips from '@/renderer/pages/conversation/Messages/components/MessageTips';
-import type { IMessageTips } from '@/common/chat/chatLib';
+import type { AgentStreamErrorInfo, IMessageTips } from '@/common/chat/chatLib';
 
-const buildTips = (type: IMessageTips['content']['type'], content = 'boom'): IMessageTips =>
+const buildTips = (
+  type: IMessageTips['content']['type'],
+  content = 'boom',
+  error?: AgentStreamErrorInfo
+): IMessageTips =>
   ({
     id: 'tip-1',
     type: 'tips',
-    content: { type, content },
+    content: { type, content, ...(error ? { error } : {}) },
   }) as IMessageTips;
 
 describe('MessageTips — FeedbackButton wiring', () => {
@@ -93,5 +97,50 @@ describe('MessageTips — FeedbackButton wiring', () => {
 
     expect(container.querySelector('strong')).not.toBeInTheDocument();
     expect(screen.getByText('<strong>boom</strong>')).toBeInTheDocument();
+  });
+
+  it('renders classified provider errors with friendly copy', () => {
+    render(
+      <MessageTips
+        message={buildTips('error', 'raw provider 401', {
+          message: 'raw provider 401',
+          code: 'USER_LLM_PROVIDER_AUTH_FAILED',
+          ownership: 'user_llm_provider',
+          detail: 'Provider returned 401.',
+          retryable: false,
+          feedback_recommended: false,
+        })}
+      />
+    );
+
+    expect(screen.getByText('conversation.agentError.codes.USER_LLM_PROVIDER_AUTH_FAILED.title')).toBeInTheDocument();
+    expect(screen.getByText('conversation.agentError.codes.USER_LLM_PROVIDER_AUTH_FAILED.body')).toBeInTheDocument();
+    expect(screen.getByText('conversation.agentError.ownership.user_llm_provider')).toBeInTheDocument();
+    expect(screen.getByText('conversation.agentError.notRetryable')).toBeInTheDocument();
+    expect(screen.queryByText('settings.oneClickFeedback')).not.toBeInTheDocument();
+  });
+
+  it('expands classified error technical details explicitly', async () => {
+    const user = userEvent.setup();
+    render(
+      <MessageTips
+        message={buildTips('error', 'raw provider 401', {
+          message: 'raw provider 401',
+          code: 'USER_LLM_PROVIDER_AUTH_FAILED',
+          ownership: 'user_llm_provider',
+          detail: 'Provider returned 401.',
+          retryable: false,
+          feedback_recommended: false,
+        })}
+      />
+    );
+
+    const detailsToggle = screen.getByRole('button', { name: /common.technical_details/ });
+    expect(detailsToggle).toHaveAttribute('aria-expanded', 'false');
+
+    await user.click(detailsToggle);
+
+    expect(detailsToggle).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByText(/Provider returned 401/)).toBeInTheDocument();
   });
 });

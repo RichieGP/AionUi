@@ -91,6 +91,96 @@
   "noAgentsAvailable": "사용 가능한 에이전트가 없습니다",
   "noModelConfigured": "모델이 설정되지 않았습니다. 설정 페이지에서 설정하세요.",
   "createFailed": "대화 생성에 실패했습니다",
+  "agentError": {
+    "fallbackTitle": "The agent could not reply",
+    "errorCode": "Error code",
+    "retryable": "Retryable",
+    "notRetryable": "Needs configuration",
+    "ownership": {
+      "aionui": "AionUi",
+      "user_agent": "Agent",
+      "user_llm_provider": "Model provider",
+      "unknown_upstream": "Upstream"
+    },
+    "codes": {
+      "AIONUI_STREAM_BROKEN": {
+        "title": "AionUi lost the response stream",
+        "body": "The app accepted your message but the response stream ended unexpectedly. Please retry; if it happens again, send feedback."
+      },
+      "AIONUI_STATE_INCONSISTENT": {
+        "title": "AionUi session state is inconsistent",
+        "body": "The conversation state is out of sync. Restart this chat or reload the app before retrying."
+      },
+      "AIONUI_PERMISSION_ERROR": {
+        "title": "AionUi could not access the requested resource",
+        "body": "A local permission or filesystem check failed. Check the project path and app permissions, then retry."
+      },
+      "AIONUI_INTERNAL_ERROR": {
+        "title": "AionUi hit an internal error",
+        "body": "This looks like an app-side problem. Please retry once; if it repeats, send feedback."
+      },
+      "USER_AGENT_NOT_INSTALLED": {
+        "title": "The selected agent is not installed",
+        "body": "Install the CLI or app required by this agent, then reconnect it in settings."
+      },
+      "USER_AGENT_STARTUP_FAILED": {
+        "title": "The selected agent failed to start",
+        "body": "The agent process exited before it was ready. Check its installation, login status, and local command configuration."
+      },
+      "USER_AGENT_DISCONNECTED": {
+        "title": "The selected agent disconnected",
+        "body": "The agent connection closed while handling this message. Restart or reconnect the agent, then retry."
+      },
+      "USER_AGENT_AUTH_REQUIRED": {
+        "title": "The selected agent needs authentication",
+        "body": "Log in to the selected agent or refresh its credentials, then send the message again."
+      },
+      "USER_AGENT_SESSION_NOT_FOUND": {
+        "title": "The agent session was lost",
+        "body": "The agent no longer recognizes this session. Start a new chat or reconnect the agent."
+      },
+      "USER_AGENT_UNSUPPORTED_METHOD": {
+        "title": "The selected agent does not support this action",
+        "body": "This agent cannot handle the requested operation. Try another agent or update the current one."
+      },
+      "USER_AGENT_INVALID_PARAMS": {
+        "title": "The selected agent rejected the request",
+        "body": "The agent reported that the request format was invalid. Try simplifying the message or switching agents."
+      },
+      "USER_LLM_PROVIDER_AUTH_FAILED": {
+        "title": "Model provider authentication failed",
+        "body": "The selected provider rejected the API key or account credentials. Check the provider settings and try again."
+      },
+      "USER_LLM_PROVIDER_CONFIG_ERROR": {
+        "title": "Model provider configuration is invalid",
+        "body": "The provider request could not be built from the current settings. Check credentials, region, Base URL, and provider-specific configuration before retrying."
+      },
+      "USER_LLM_PROVIDER_MODEL_NOT_FOUND": {
+        "title": "The selected model was not found",
+        "body": "The provider does not recognize this model name. Choose an available model from settings and retry."
+      },
+      "USER_LLM_PROVIDER_RATE_LIMITED": {
+        "title": "Model provider rate limit reached",
+        "body": "The provider is temporarily limiting requests. Wait a moment, reduce request frequency, or switch models."
+      },
+      "USER_LLM_PROVIDER_TIMEOUT": {
+        "title": "Model provider request timed out",
+        "body": "The provider did not respond in time. Retry later or switch to a more stable provider."
+      },
+      "USER_LLM_PROVIDER_NETWORK_ERROR": {
+        "title": "Could not reach the model provider",
+        "body": "A network or DNS error prevented access to the provider. Check your network, proxy, and Base URL."
+      },
+      "USER_LLM_PROVIDER_GATEWAY_ERROR": {
+        "title": "Model provider service is unavailable",
+        "body": "The provider returned a gateway or service error. Retry later or use another provider."
+      },
+      "UNKNOWN_UPSTREAM_ERROR": {
+        "title": "The upstream agent or provider failed",
+        "body": "AionUi received an upstream error but could not classify it confidently. Review the details below or send feedback."
+      }
+    }
+  },
   "workspace": {
     "title": "프로젝트",
     "pasteConfirm_title": "파일 붙여넣기",

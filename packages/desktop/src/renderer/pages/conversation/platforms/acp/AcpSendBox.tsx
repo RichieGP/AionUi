@@ -1,5 +1,6 @@
 import { ipcBridge } from '@/common';
 import { isBackendHttpError } from '@/common/adapter/httpBridge';
+import type { AgentStreamErrorInfo } from '@/common/chat/chatLib';
 import { isSideQuestionSupported } from '@/common/chat/sideQuestion';
 import { parseError, uuid } from '@/common/utils';
 import AgentModeSelector from '@/renderer/components/agent/AgentModeSelector';
@@ -54,6 +55,28 @@ const useAcpSendBoxDraft = getSendBoxDraftHook('acp', {
 
 const EMPTY_AT_PATH: Array<string | FileOrFolderItem> = [];
 const EMPTY_UPLOAD_FILES: string[] = [];
+
+const buildSendFailureError = (error: unknown, message: string): AgentStreamErrorInfo => {
+  if (isBackendHttpError(error) && error.code === 'BAD_GATEWAY') {
+    return {
+      message,
+      code: 'UNKNOWN_UPSTREAM_ERROR',
+      ownership: 'unknown_upstream',
+      detail: message,
+      retryable: true,
+      feedback_recommended: true,
+    };
+  }
+
+  return {
+    message,
+    code: 'AIONUI_INTERNAL_ERROR',
+    ownership: 'aionui',
+    detail: message,
+    retryable: true,
+    feedback_recommended: true,
+  };
+};
 
 const useSendBoxDraft = (conversation_id: string) => {
   const { data, mutate } = useAcpSendBoxDraft(conversation_id);
@@ -304,8 +327,9 @@ Please check your local CLI tool authentication status`,
               conversation_id,
               created_at: Date.now(),
               content: {
-                content: t('acp.send.failed', { error: errorMsg }),
+                content: errorMsg,
                 type: 'error',
+                error: buildSendFailureError(error, errorMsg),
               },
             },
             true
