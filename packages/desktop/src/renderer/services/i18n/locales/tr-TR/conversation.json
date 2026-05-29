@@ -89,6 +89,7 @@
     "errorCode": "Error code",
     "retryable": "Retryable",
     "notRetryable": "Needs configuration",
+    "resolutionPrefix": "Suggestion: ",
     "resolution": {
       "retry": "Retry later, or send this message again.",
       "wait_for_current_response": "Wait for the current response to finish before sending another message.",

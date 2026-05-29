@@ -342,6 +342,7 @@ export type I18nKey =
   | 'conversation.agentError.resolution.send_feedback'
   | 'conversation.agentError.resolution.start_new_session'
   | 'conversation.agentError.resolution.wait_for_current_response'
+  | 'conversation.agentError.resolutionPrefix'
   | 'conversation.agentError.retryable'
   | 'conversation.chat.apiErrorNoCli'
   | 'conversation.chat.apiErrorSwitchFailed'

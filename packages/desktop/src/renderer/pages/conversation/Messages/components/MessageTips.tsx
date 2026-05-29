@@ -92,7 +92,9 @@ const MessageTips: React.FC<{ message: IMessageTips }> = ({ message }) => {
           ? t('conversation.agentError.retryable')
           : t('conversation.agentError.notRetryable');
     const resolutionHint = structuredError.resolution
-      ? t(`conversation.agentError.resolution.${structuredError.resolution.kind}`)
+      ? `${t('conversation.agentError.resolutionPrefix')}${t(
+          `conversation.agentError.resolution.${structuredError.resolution.kind}`
+        )}`
       : null;
     const detailParts = [
       code ? `${t('conversation.agentError.errorCode')}: ${code}` : '',

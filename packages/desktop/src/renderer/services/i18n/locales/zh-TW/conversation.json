@@ -96,6 +96,7 @@
     "errorCode": "錯誤碼",
     "retryable": "可重試",
     "notRetryable": "需先處理設定",
+    "resolutionPrefix": "建議：",
     "resolution": {
       "retry": "Retry later, or send this message again.",
       "wait_for_current_response": "Wait for the current response to finish before sending another message.",

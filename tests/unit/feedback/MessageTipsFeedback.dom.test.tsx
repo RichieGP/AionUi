@@ -184,7 +184,7 @@ describe('MessageTips — FeedbackButton wiring', () => {
       />
     );
 
-    expect(screen.getByText('Check the model provider balance, credits, or quota.')).toBeInTheDocument();
+    expect(screen.getByText('Suggestion: Check the model provider balance, credits, or quota.')).toBeInTheDocument();
   });
 
   it('renders billing-required provider errors from i18n instead of backend fallback text', () => {
@@ -233,6 +233,9 @@ describe('agent error locale copy', () => {
 
     for (const localeName of localeNames) {
       const locale = JSON.parse(readFileSync(path.join(localeDir, localeName, 'conversation.json'), 'utf8'));
+
+      expect(locale.agentError.resolutionPrefix, `${localeName} resolution prefix`).toEqual(expect.any(String));
+      expect(locale.agentError.resolutionPrefix.trim(), `${localeName} resolution prefix`).not.toBe('');
 
       for (const code of requiredAgentErrorCodes) {
         expect(locale.agentError.codes[code]?.title, `${localeName} ${code} title`).toEqual(expect.any(String));
