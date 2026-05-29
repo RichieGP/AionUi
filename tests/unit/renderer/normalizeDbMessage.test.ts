@@ -28,6 +28,10 @@ describe('normalizeDbMessage', () => {
           detail: 'ACP init failed: config file is invalid',
           retryable: true,
           feedback_recommended: true,
+          resolution: {
+            kind: 'start_new_session',
+            target: 'new_conversation',
+          },
         },
       }),
     } as unknown as IMessageTips) as IMessageTips;
@@ -39,6 +43,10 @@ describe('normalizeDbMessage', () => {
       detail: 'ACP init failed: config file is invalid',
       retryable: true,
       feedback_recommended: true,
+      resolution: {
+        kind: 'start_new_session',
+        target: 'new_conversation',
+      },
     });
   });
 

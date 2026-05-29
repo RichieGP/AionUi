@@ -127,6 +127,29 @@ export type IMessageText = IMessage<
 
 export type AgentErrorOwnership = 'aionui' | 'user_agent' | 'user_llm_provider' | 'unknown_upstream';
 
+export type AgentErrorResolutionKind =
+  | 'retry'
+  | 'wait_for_current_response'
+  | 'start_new_session'
+  | 'reconnect_agent'
+  | 'check_agent_login'
+  | 'check_agent_installation'
+  | 'check_agent_version'
+  | 'check_local_command'
+  | 'check_provider_credentials'
+  | 'check_provider_billing'
+  | 'check_provider_base_url'
+  | 'change_model'
+  | 'reduce_context'
+  | 'send_feedback';
+
+export type AgentErrorResolutionTarget = 'provider_settings' | 'agent_settings' | 'new_conversation' | 'feedback';
+
+export type AgentErrorResolution = {
+  kind: AgentErrorResolutionKind;
+  target?: AgentErrorResolutionTarget;
+};
+
 export type AgentStreamErrorInfo = {
   message: string;
   code?: string;
@@ -134,6 +157,7 @@ export type AgentStreamErrorInfo = {
   detail?: string;
   retryable?: boolean;
   feedback_recommended?: boolean;
+  resolution?: AgentErrorResolution;
 };
 
 export type IMessageTips = IMessage<
@@ -369,6 +393,50 @@ const AGENT_ERROR_OWNERSHIPS = new Set<AgentErrorOwnership>([
   'unknown_upstream',
 ]);
 
+const AGENT_ERROR_RESOLUTION_KINDS = new Set<AgentErrorResolutionKind>([
+  'retry',
+  'wait_for_current_response',
+  'start_new_session',
+  'reconnect_agent',
+  'check_agent_login',
+  'check_agent_installation',
+  'check_agent_version',
+  'check_local_command',
+  'check_provider_credentials',
+  'check_provider_billing',
+  'check_provider_base_url',
+  'change_model',
+  'reduce_context',
+  'send_feedback',
+]);
+
+const AGENT_ERROR_RESOLUTION_TARGETS = new Set<AgentErrorResolutionTarget>([
+  'provider_settings',
+  'agent_settings',
+  'new_conversation',
+  'feedback',
+]);
+
+export const normalizeAgentErrorResolution = (value: unknown): AgentErrorResolution | undefined => {
+  if (!isObject(value) || typeof value.kind !== 'string') {
+    return undefined;
+  }
+
+  if (!AGENT_ERROR_RESOLUTION_KINDS.has(value.kind as AgentErrorResolutionKind)) {
+    return undefined;
+  }
+
+  const target =
+    typeof value.target === 'string' && AGENT_ERROR_RESOLUTION_TARGETS.has(value.target as AgentErrorResolutionTarget)
+      ? (value.target as AgentErrorResolutionTarget)
+      : undefined;
+
+  return {
+    kind: value.kind as AgentErrorResolutionKind,
+    ...(target ? { target } : {}),
+  };
+};
+
 export const normalizeAgentStreamError = (value: unknown): AgentStreamErrorInfo | undefined => {
   if (!isObject(value) || typeof value.message !== 'string') {
     return undefined;
@@ -382,8 +450,9 @@ export const normalizeAgentStreamError = (value: unknown): AgentStreamErrorInfo 
   const detail = typeof value.detail === 'string' ? value.detail : undefined;
   const retryable = typeof value.retryable === 'boolean' ? value.retryable : undefined;
   const feedback_recommended = typeof value.feedback_recommended === 'boolean' ? value.feedback_recommended : undefined;
+  const resolution = normalizeAgentErrorResolution(value.resolution);
 
-  if (!code && !ownership && !detail && retryable === undefined && feedback_recommended === undefined) {
+  if (!code && !ownership && !detail && retryable === undefined && feedback_recommended === undefined && !resolution) {
     return undefined;
   }
 
@@ -394,6 +463,7 @@ export const normalizeAgentStreamError = (value: unknown): AgentStreamErrorInfo 
     ...(detail ? { detail } : {}),
     ...(retryable !== undefined ? { retryable } : {}),
     ...(feedback_recommended !== undefined ? { feedback_recommended } : {}),
+    ...(resolution ? { resolution } : {}),
   };
 };
 

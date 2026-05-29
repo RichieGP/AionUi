@@ -8,6 +8,7 @@ import { describe, expect, it } from 'vitest';
 import type { IResponseMessage } from '@/common/adapter/ipcBridge';
 import {
   composeMessage,
+  normalizeAgentStreamError,
   transformMessage,
   type IMessageTips,
   type IMessageAcpToolCall,
@@ -100,6 +101,51 @@ describe('composeMessage', () => {
   });
 });
 
+describe('normalizeAgentStreamError', () => {
+  it('treats resolution-only error metadata as structured', () => {
+    expect(
+      normalizeAgentStreamError({
+        message: 'Agent is still responding',
+        resolution: {
+          kind: 'wait_for_current_response',
+        },
+      }),
+    ).toEqual({
+      message: 'Agent is still responding',
+      resolution: {
+        kind: 'wait_for_current_response',
+      },
+    });
+  });
+
+  it('drops unknown resolution kind and target values', () => {
+    expect(
+      normalizeAgentStreamError({
+        message: 'Provider authentication failed',
+        resolution: {
+          kind: 'check_provider_credentials',
+          target: 'unexpected_settings',
+        },
+      }),
+    ).toEqual({
+      message: 'Provider authentication failed',
+      resolution: {
+        kind: 'check_provider_credentials',
+      },
+    });
+
+    expect(
+      normalizeAgentStreamError({
+        message: 'Unknown recovery action',
+        resolution: {
+          kind: 'open_secret_panel',
+          target: 'provider_settings',
+        },
+      }),
+    ).toBeUndefined();
+  });
+});
+
 describe('transformMessage', () => {
   it('returns undefined for hidden system stream messages', () => {
     const message: IResponseMessage = {
@@ -123,6 +169,10 @@ describe('transformMessage', () => {
         detail: 'Provider returned 401.',
         retryable: false,
         feedback_recommended: false,
+        resolution: {
+          kind: 'check_provider_credentials',
+          target: 'provider_settings',
+        },
       },
       msg_id: 'error-1',
       conversation_id: CONVERSATION_ID,
@@ -139,6 +189,10 @@ describe('transformMessage', () => {
       detail: 'Provider returned 401.',
       retryable: false,
       feedback_recommended: false,
+      resolution: {
+        kind: 'check_provider_credentials',
+        target: 'provider_settings',
+      },
     });
   });
 });
