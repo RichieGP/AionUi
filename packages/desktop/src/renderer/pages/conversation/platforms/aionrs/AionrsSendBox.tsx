@@ -36,6 +36,7 @@ import {
 import { getConversationOrNull } from '@/renderer/pages/conversation/utils/conversationCache';
 import { getConversationRuntimeWorkspaceErrorMessage } from '@/renderer/pages/conversation/utils/conversationCreateError';
 import { warmupConversation } from '@/renderer/pages/conversation/utils/warmupConversation';
+import { useWarmupConversationStatus } from '@/renderer/pages/conversation/utils/useWarmupConversationStatus';
 import { usePreviewContext } from '@/renderer/pages/conversation/Preview';
 import { useTeamPermission } from '@/renderer/pages/team/hooks/TeamPermissionContext';
 import { allSupportedExts } from '@/renderer/services/FileService';
@@ -44,7 +45,7 @@ import { emitter, useAddEventListener } from '@/renderer/utils/emitter';
 import { mergeFileSelectionItems } from '@/renderer/utils/file/fileSelection';
 import { buildDisplayMessage, collectSelectedFiles } from '@/renderer/utils/file/messageFiles';
 import { mergeWithCapabilities, type AgentModeOption } from '@/renderer/utils/model/agentModes';
-import { Message, Tag } from '@arco-design/web-react';
+import { Alert, Message, Tag } from '@arco-design/web-react';
 import { Brain, MagicHat, Shield } from '@icon-park/react';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -120,6 +121,7 @@ const AionrsSendBox: React.FC<{
   const { current_model } = modelSelection;
   const teamPermission = useTeamPermission();
   const propagateMode = teamPermission?.propagateMode;
+  const { showPreparingHint } = useWarmupConversationStatus(conversation_id);
 
   const { thought, running, hasHydratedRunningState, setActiveMsgId, setWaitingResponse, resetState } =
     useAionrsMessage(conversation_id, {
@@ -579,6 +581,14 @@ const AionrsSendBox: React.FC<{
         onClear={clear}
       />
       <ThoughtDisplay thought={thought} running={running} onStop={handleStop} />
+      {showPreparingHint && (
+        <Alert
+          className='mb-8px'
+          type='info'
+          content={t('conversation.runtimePreparing.sendboxHint')}
+          closable={false}
+        />
+      )}
 
       <SendBox
         data-testid='aionrs-sendbox'

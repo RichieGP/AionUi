@@ -137,6 +137,7 @@ const InlineAgentEditor: React.FC<InlineAgentEditorProps> = ({ agent, onSave, on
   const [jsonError, setJsonError] = useState('');
   const isJsonEditingRef = useRef(false);
   const [testStatus, setTestStatus] = useState<TestStatus>('idle');
+  const [testErrorDetail, setTestErrorDetail] = useState('');
 
   // Canonical empty shape shown when the user has not filled anything yet.
   // Keep keys in sync with CustomAgentAdvancedOverrides.
@@ -158,6 +159,7 @@ const InlineAgentEditor: React.FC<InlineAgentEditorProps> = ({ agent, onSave, on
 
   useEffect(() => {
     setTestStatus('idle');
+    setTestErrorDetail('');
     setJsonError('');
     isJsonEditingRef.current = false;
     if (agent) {
@@ -241,6 +243,7 @@ const InlineAgentEditor: React.FC<InlineAgentEditorProps> = ({ agent, onSave, on
 
   const handleTestConnection = useCallback(async () => {
     setTestStatus('testing');
+    setTestErrorDetail('');
     try {
       const parsedArgs = parseArgsString(argsString);
       const envObj = envVarsToObject(envVars);
@@ -252,16 +255,20 @@ const InlineAgentEditor: React.FC<InlineAgentEditorProps> = ({ agent, onSave, on
       switch (result.step) {
         case 'success':
           setTestStatus('success');
+          setTestErrorDetail('');
           break;
         case 'fail_cli':
           setTestStatus('fail_cli');
+          setTestErrorDetail(result.error || '');
           break;
         case 'fail_acp':
           setTestStatus('fail_acp');
+          setTestErrorDetail(result.error || '');
           break;
       }
-    } catch {
+    } catch (error) {
       setTestStatus('fail_cli');
+      setTestErrorDetail(error instanceof Error ? error.message : String(error));
     }
   }, [command, argsString, envVars]);
 
@@ -413,7 +420,12 @@ const InlineAgentEditor: React.FC<InlineAgentEditorProps> = ({ agent, onSave, on
             className='mt-10px'
             type='error'
             icon={<CloseOne theme='filled' size={16} />}
-            content={t('settings.testConnectionFailCli')}
+            content={
+              <div className='flex flex-col gap-4px'>
+                <span>{t('settings.testConnectionFailCli')}</span>
+                {testErrorDetail ? <span className='text-12px break-all opacity-80'>{testErrorDetail}</span> : null}
+              </div>
+            }
           />
         )}
         {testStatus === 'fail_acp' && (
@@ -421,7 +433,12 @@ const InlineAgentEditor: React.FC<InlineAgentEditorProps> = ({ agent, onSave, on
             className='mt-10px'
             type='warning'
             icon={<CloseOne theme='filled' size={16} />}
-            content={t('settings.testConnectionFailAcp')}
+            content={
+              <div className='flex flex-col gap-4px'>
+                <span>{t('settings.testConnectionFailAcp')}</span>
+                {testErrorDetail ? <span className='text-12px break-all opacity-80'>{testErrorDetail}</span> : null}
+              </div>
+            }
           />
         )}
       </div>

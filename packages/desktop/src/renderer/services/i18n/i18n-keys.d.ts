@@ -477,6 +477,7 @@ export type I18nKey =
   | 'conversation.noAgentsAvailable'
   | 'conversation.noModelConfigured'
   | 'conversation.notFound'
+  | 'conversation.runtimePreparing.sendboxHint'
   | 'conversation.sendbox.hint'
   | 'conversation.sideQuestion.alreadyRunning'
   | 'conversation.sideQuestion.answered'

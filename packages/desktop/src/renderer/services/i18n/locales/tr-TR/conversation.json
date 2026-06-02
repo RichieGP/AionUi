@@ -476,6 +476,9 @@
       "unsupported": "Desteklenmiyor"
     }
   },
+  "runtimePreparing": {
+    "sendboxHint": "Yönetilen Node çalışma zamanı hazırlanıyor. İlk başlatma biraz daha uzun sürebilir."
+  },
   "sendbox": {
     "hint": "Komutlar için /, dosya için @ yazın"
   },

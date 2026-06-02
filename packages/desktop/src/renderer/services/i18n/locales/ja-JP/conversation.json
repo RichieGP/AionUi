@@ -474,6 +474,9 @@
       "unsupported": "非対応"
     }
   },
+  "runtimePreparing": {
+    "sendboxHint": "管理対象の Node ランタイムを準備しています。初回起動は少し時間がかかる場合があります。"
+  },
   "sendbox": {
     "hint": "/ でコマンド、@ でファイルを参照"
   },
