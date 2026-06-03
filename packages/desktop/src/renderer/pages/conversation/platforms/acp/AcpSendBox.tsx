@@ -34,14 +34,14 @@ import {
 import { usePreviewContext } from '@/renderer/pages/conversation/Preview';
 import { getConversationRuntimeWorkspaceErrorMessage } from '@/renderer/pages/conversation/utils/conversationCreateError';
 import { warmupConversation } from '@/renderer/pages/conversation/utils/warmupConversation';
-import { useWarmupConversationStatus } from '@/renderer/pages/conversation/utils/useWarmupConversationStatus';
+import { useWarmupConversationInfoNotice } from '@/renderer/pages/conversation/utils/useWarmupConversationInfoNotice';
 import { useTeamPermission } from '@/renderer/pages/team/hooks/TeamPermissionContext';
 import { allSupportedExts } from '@/renderer/services/FileService';
 import { iconColors } from '@/renderer/styles/colors';
 import { emitter, useAddEventListener } from '@/renderer/utils/emitter';
 import { mergeFileSelectionItems } from '@/renderer/utils/file/fileSelection';
 import { buildDisplayMessage } from '@/renderer/utils/file/messageFiles';
-import { Alert, Message, Tag } from '@arco-design/web-react';
+import { Message, Tag } from '@arco-design/web-react';
 import { Brain, MagicHat, Shield } from '@icon-park/react';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -129,7 +129,7 @@ const AcpSendBox: React.FC<{
     }));
   const [isMobileSheetOpen, setIsMobileSheetOpen] = useState(false);
   const [currentMode, setCurrentMode] = useState<string | undefined>(session_mode);
-  const { showPreparingHint } = useWarmupConversationStatus(conversation_id);
+  useWarmupConversationInfoNotice(conversation_id, t('conversation.runtimePreparing.sendboxHint'));
   const prepareRuntimeSync = useCallback(async () => {
     if (teamPermission) {
       await teamPermission.warmupSession();
@@ -590,14 +590,6 @@ Please check your local CLI tool authentication status`,
         onClear={clear}
       />
       <ThoughtDisplay running={aiProcessing && !hasThinkingMessage} onStop={handleStop} />
-      {showPreparingHint && (
-        <Alert
-          className='mb-8px'
-          type='info'
-          content={t('conversation.runtimePreparing.sendboxHint')}
-          closable={false}
-        />
-      )}
 
       <SendBox
         onMobilePlusClick={isMobile ? () => setIsMobileSheetOpen(true) : undefined}
