@@ -14,9 +14,6 @@ import { useWorkspaceCollapse } from '@/renderer/pages/conversation/hooks/useWor
 import { PreviewPanel, usePreviewContext } from '@/renderer/pages/conversation/Preview';
 import { dispatchWorkspaceToggleEvent } from '@/renderer/utils/workspace/workspaceEvents';
 import { useConversationAgents } from '@/renderer/pages/conversation/hooks/useConversationAgents';
-import { warmupConversation } from '@/renderer/pages/conversation/utils/warmupConversation';
-import RuntimeStatusBanner from '@/renderer/runtime/RuntimeStatusBanner';
-import { useRuntimeStatus } from '@/renderer/runtime/runtimeStatusStore';
 import classNames from 'classnames';
 import { isMacEnvironment, isWindowsEnvironment } from '@/renderer/pages/conversation/utils/detectPlatform';
 import {
@@ -66,7 +63,6 @@ const ChatLayout: React.FC<{
 }> = (props) => {
   const { conversation_id, workspacePath, isTemporaryWorkspace } = props;
   const { backend, presetAssistant, agent_name, workspaceEnabled = true, workspacePreferenceKey } = props;
-  const runtimeStatus = useRuntimeStatus(conversation_id ? { kind: 'conversation', id: conversation_id } : undefined);
   const layout = useLayoutContext();
   const isMacRuntime = isMacEnvironment();
   const isWindowsRuntime = isWindowsEnvironment();
@@ -271,21 +267,7 @@ const ChatLayout: React.FC<{
             flexBasis: 0,
           }}
         >
-          <div className='shrink-0 !bg-1'>
-            {headerBlock}
-            {runtimeStatus && runtimeStatus.phase !== 'ready' ? (
-              <RuntimeStatusBanner
-                status={runtimeStatus}
-                onRetry={
-                  conversation_id
-                    ? () => {
-                        void warmupConversation(conversation_id).catch(() => {});
-                      }
-                    : undefined
-                }
-              />
-            ) : null}
-          </div>
+          <div className='shrink-0 !bg-1'>{headerBlock}</div>
           <div className='flex flex-1 min-h-0 relative'>
             {/* Chat area - always mounted, never unmounted on preview toggle */}
             <div
