@@ -974,7 +974,8 @@
     "failedHttp": "{{resource}} 下載失敗（HTTP {{status}}）。",
     "failedValidation": "{{resource}} 驗證失敗，請重試。",
     "failedUnsupported": "目前平台暫不支援 {{resource}}。",
-    "failedUnknown": "{{resource}} 準備失敗，請重試。"
+    "failedUnknown": "{{resource}} 準備失敗，請重試。",
+    "failedChecksum": "驗證 {{resource}} 失敗，下載的檔案可能已損壞。請重試。"
   },
   "runtimeScope": {
     "conversation": "對話",

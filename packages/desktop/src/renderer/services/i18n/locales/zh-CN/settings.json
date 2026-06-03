@@ -973,7 +973,8 @@
     "failedHttp": "{{resource}} 下载失败（HTTP {{status}}）。",
     "failedValidation": "{{resource}} 校验失败，请重试。",
     "failedUnsupported": "当前平台暂不支持 {{resource}}。",
-    "failedUnknown": "{{resource}} 准备失败，请重试。"
+    "failedUnknown": "{{resource}} 准备失败，请重试。",
+    "failedChecksum": "校验 {{resource}} 失败，下载文件可能已损坏。请重试。"
   },
   "runtimeResource": {
     "node": "托管 Node 运行环境",

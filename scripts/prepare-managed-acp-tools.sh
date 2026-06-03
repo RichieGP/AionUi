@@ -17,6 +17,7 @@ Environment variables:
   MANAGED_ACP_OVERWRITE        Optional. true/false. Default: false
   MANAGED_ACP_WRITE_ROOT_MANIFEST
                                Optional. true/false. Default: false
+  MANAGED_ACP_NPM_VERSION      Optional. Exact npm version expected in PATH.
   CODEX_ACP_VERSION            Optional. Default: 0.14.0
   CLAUDE_ACP_VERSION           Optional. Default: 0.39.0
 EOF
@@ -57,6 +58,7 @@ MANAGED_ACP_CDN_BASE="${MANAGED_ACP_CDN_BASE:-https://static.aionui.com/managed/
 MANAGED_ACP_TARGETS="${MANAGED_ACP_TARGETS:-darwin-arm64,darwin-x64,linux-x64,linux-arm64,win32-x64,win32-arm64}"
 MANAGED_ACP_OVERWRITE="${MANAGED_ACP_OVERWRITE:-false}"
 MANAGED_ACP_WRITE_ROOT_MANIFEST="${MANAGED_ACP_WRITE_ROOT_MANIFEST:-false}"
+MANAGED_ACP_NPM_VERSION="${MANAGED_ACP_NPM_VERSION:-}"
 CODEX_ACP_VERSION="${CODEX_ACP_VERSION:-0.14.0}"
 CLAUDE_ACP_VERSION="${CLAUDE_ACP_VERSION:-0.39.0}"
 
@@ -74,6 +76,14 @@ sanitize_version() {
 
 CODEX_ACP_VERSION="$(sanitize_version "${CODEX_ACP_VERSION}")"
 CLAUDE_ACP_VERSION="$(sanitize_version "${CLAUDE_ACP_VERSION}")"
+
+if [[ -n "${MANAGED_ACP_NPM_VERSION}" ]]; then
+  MANAGED_ACP_NPM_VERSION="$(sanitize_version "${MANAGED_ACP_NPM_VERSION}")"
+  if [[ "$(npm --version)" != "${MANAGED_ACP_NPM_VERSION}" ]]; then
+    echo "npm version mismatch: expected ${MANAGED_ACP_NPM_VERSION}, got $(npm --version)" >&2
+    exit 1
+  fi
+fi
 
 aws_s3_cp() {
   if [[ -n "${AWS_ENDPOINT_URL:-}" ]]; then
@@ -204,14 +214,118 @@ pack_artifact() {
 
 make_project_dir() {
   local project_dir="$1"
+  local package_name="$2"
+  local version="$3"
   mkdir -p "${project_dir}"
-  cat > "${project_dir}/package.json" <<'EOF'
-{
-  "name": "managed-acp-artifact",
-  "private": true,
-  "version": "0.0.0"
-}
+  node - "${project_dir}" "${package_name}" "${version}" <<'EOF'
+const fs = require('node:fs');
+const path = require('node:path');
+
+const [, , projectDir, packageName, version] = process.argv;
+const packageJson = {
+  name: 'managed-acp-artifact',
+  private: true,
+  version: '0.0.0',
+  dependencies: {
+    [packageName]: version,
+  },
+};
+
+fs.writeFileSync(path.join(projectDir, 'package.json'), `${JSON.stringify(packageJson, null, 2)}\n`);
 EOF
+}
+
+generate_lockfile() {
+  local project_dir="$1"
+  local npm_cache_dir="$2"
+  local platform="$3"
+  local arch="$4"
+
+  (
+    cd "${project_dir}"
+    export npm_config_cache="${npm_cache_dir}"
+    export npm_config_fund=false
+    export npm_config_audit=false
+    npm install --package-lock-only --omit=dev --os="${platform}" --cpu="${arch}"
+  )
+}
+
+install_from_lockfile() {
+  local project_dir="$1"
+  local npm_cache_dir="$2"
+  local platform="$3"
+  local arch="$4"
+
+  (
+    cd "${project_dir}"
+    export npm_config_cache="${npm_cache_dir}"
+    export npm_config_fund=false
+    export npm_config_audit=false
+    npm ci --omit=dev --os="${platform}" --cpu="${arch}"
+  )
+}
+
+manifest_entrypoint() {
+  local manifest_path="$1"
+
+  node - "${manifest_path}" <<'EOF'
+const fs = require('node:fs');
+
+const [, , manifestPath] = process.argv;
+const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+if (!manifest.entrypoint) {
+  throw new Error(`Missing entrypoint in ${manifestPath}`);
+}
+process.stdout.write(manifest.entrypoint);
+EOF
+}
+
+validate_bridge_entrypoint() {
+  local tool_slug="$1"
+  local project_dir="$2"
+  local manifest_path="$3"
+
+  local entrypoint_rel
+  entrypoint_rel="$(manifest_entrypoint "${manifest_path}")"
+  local entrypoint_abs="${project_dir}/${entrypoint_rel}"
+
+  if [[ ! -f "${entrypoint_abs}" ]]; then
+    echo "Resolved ${tool_slug} entrypoint missing: ${entrypoint_rel}" >&2
+    exit 1
+  fi
+
+  node --check "${entrypoint_abs}" >/dev/null
+}
+
+validate_platform_binary() {
+  local tool_slug="$1"
+  local project_dir="$2"
+  local target="$3"
+
+  local expected_path=""
+  case "${tool_slug}" in
+    codex-acp)
+      expected_path="${project_dir}/node_modules/@zed-industries/codex-acp-${target}/bin/codex-acp"
+      if [[ "${target}" == win32-* ]]; then
+        expected_path="${expected_path}.exe"
+      fi
+      ;;
+    claude-agent-acp)
+      expected_path="${project_dir}/node_modules/@anthropic-ai/claude-agent-sdk-${target}/claude"
+      if [[ "${target}" == win32-* ]]; then
+        expected_path="${expected_path}.exe"
+      fi
+      ;;
+    *)
+      echo "Unknown ACP tool slug for platform validation: ${tool_slug}" >&2
+      exit 1
+      ;;
+  esac
+
+  if [[ ! -f "${expected_path}" ]]; then
+    echo "Expected platform binary missing for ${tool_slug} (${target}): ${expected_path}" >&2
+    exit 1
+  fi
 }
 
 prepare_tool_target() {
@@ -235,18 +349,17 @@ prepare_tool_target() {
   local artifact_url="${MANAGED_ACP_CDN_BASE}/${tool_slug}/${version}/${artifact_filename}"
 
   mkdir -p "${project_dir}" "${npm_cache_dir}"
-  make_project_dir "${project_dir}"
+  make_project_dir "${project_dir}" "${package_name}" "${version}"
 
-  echo "==> Installing ${package_name}@${version} for ${target}"
-  (
-    cd "${project_dir}"
-    export npm_config_cache="${npm_cache_dir}"
-    export npm_config_fund=false
-    export npm_config_audit=false
-    npm install --no-save --omit=dev --os="${platform}" --cpu="${arch}" "${package_name}@${version}"
-  )
+  echo "==> Generating lockfile for ${package_name}@${version} (${target})"
+  generate_lockfile "${project_dir}" "${npm_cache_dir}" "${platform}" "${arch}"
+
+  echo "==> Installing ${package_name}@${version} for ${target} from lockfile"
+  install_from_lockfile "${project_dir}" "${npm_cache_dir}" "${platform}" "${arch}"
 
   resolve_entrypoint_manifest "${package_name}" "${project_dir}" "${local_manifest_path}"
+  validate_bridge_entrypoint "${tool_slug}" "${project_dir}" "${local_manifest_path}"
+  validate_platform_binary "${tool_slug}" "${project_dir}" "${target}"
   pack_artifact "${project_dir}" "${artifact_path}" "${archive_ext}"
 
   local sha256

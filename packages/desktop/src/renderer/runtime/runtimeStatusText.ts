@@ -98,6 +98,11 @@ export function formatRuntimeStatusText(t: TFunction, status: IRuntimeStatusEven
             status: status.status_code ?? 'unknown',
             defaultValue: 'Downloading {{resource}} failed (HTTP {{status}}).',
           });
+        case 'checksum_mismatch':
+          return t('settings.runtimeStatus.failedChecksum', {
+            resource,
+            defaultValue: 'Verifying {{resource}} failed because the downloaded file was corrupted. Try again.',
+          });
         case 'validation_failed':
           return t('settings.runtimeStatus.failedValidation', {
             resource,

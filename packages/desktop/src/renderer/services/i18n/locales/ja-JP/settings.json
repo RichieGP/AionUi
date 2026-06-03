@@ -974,7 +974,8 @@
     "failedHttp": "Downloading {{resource}} failed (HTTP {{status}}).",
     "failedValidation": "Validating {{resource}} failed. Try again.",
     "failedUnsupported": "{{resource}} is not supported on this platform.",
-    "failedUnknown": "Preparing {{resource}} failed. Try again."
+    "failedUnknown": "Preparing {{resource}} failed. Try again.",
+    "failedChecksum": "{{resource}} の検証に失敗しました。ダウンロードしたファイルが破損している可能性があります。もう一度お試しください。"
   },
   "runtimeScope": {
     "conversation": "Conversation",

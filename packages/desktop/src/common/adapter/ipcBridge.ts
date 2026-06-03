@@ -348,6 +348,7 @@ export type RuntimeFailureKind =
   | 'timeout'
   | 'download_failed'
   | 'http_status'
+  | 'checksum_mismatch'
   | 'validation_failed'
   | 'unsupported_platform'
   | 'unknown';

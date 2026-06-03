@@ -1724,6 +1724,7 @@ export type I18nKey =
   | 'settings.runtimeScope.mcp'
   | 'settings.runtimeStatus.downloading'
   | 'settings.runtimeStatus.extracting'
+  | 'settings.runtimeStatus.failedChecksum'
   | 'settings.runtimeStatus.failedDownload'
   | 'settings.runtimeStatus.failedHttp'
   | 'settings.runtimeStatus.failedTimeout'

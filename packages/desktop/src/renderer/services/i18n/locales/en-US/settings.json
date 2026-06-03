@@ -972,7 +972,8 @@
     "failedHttp": "Downloading {{resource}} failed (HTTP {{status}}).",
     "failedValidation": "Validating {{resource}} failed. Try again.",
     "failedUnsupported": "{{resource}} is not supported on this platform.",
-    "failedUnknown": "Preparing {{resource}} failed. Try again."
+    "failedUnknown": "Preparing {{resource}} failed. Try again.",
+    "failedChecksum": "Verifying {{resource}} failed because the downloaded file was corrupted. Try again."
   },
   "runtimeResource": {
     "node": "the managed Node runtime",
