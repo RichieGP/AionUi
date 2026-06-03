@@ -88,6 +88,7 @@ import Router from './components/layout/Router';
 import Sider from './components/layout/Sider';
 import { useAuth } from './hooks/context/AuthContext';
 import { ConversationHistoryProvider } from './hooks/context/ConversationHistoryContext';
+import GlobalRuntimeStatus from './runtime/GlobalRuntimeStatus';
 import HOC from './utils/ui/HOC';
 import type { BackendStartupFailureInfo } from '@/common/types/platform/electron';
 
@@ -128,7 +129,15 @@ const AppProviders: React.FC<PropsWithChildren> = ({ children }) =>
     React.createElement(
       ThemeProvider,
       null,
-      React.createElement(PreviewProvider, null, React.createElement(FeedbackProvider, null, children))
+      React.createElement(
+        PreviewProvider,
+        null,
+        React.createElement(
+          FeedbackProvider,
+          null,
+          React.createElement(React.Fragment, null, React.createElement(GlobalRuntimeStatus, null), children)
+        )
+      )
     )
   );
 

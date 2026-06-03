@@ -734,7 +734,7 @@ export const acpConversation = {
   refreshCustomAgents: httpPost<void, void>('/api/agents/refresh'),
   testCustomAgent: httpPost<
     { step: 'success' } | { step: 'fail_cli'; error: string } | { step: 'fail_acp'; error: string },
-    { command: string; acp_args?: string[]; env?: Record<string, string> }
+    { command: string; acp_args?: string[]; env?: Record<string, string>; runtime_scope_id?: string }
   >('/api/agents/custom/try-connect'),
   createCustomAgent: httpPost<
     AgentMetadata,
@@ -873,7 +873,7 @@ export const mcpService = {
       wwwAuthenticate?: string;
       www_authenticate?: string;
     },
-    IMcpServer
+    IMcpServer & { runtime_scope_id?: string }
   >('/api/mcp/test-connection'),
   checkOAuthStatus: httpPost<{ authenticated: boolean }, { server_url: string }>('/api/mcp/oauth/check-status'),
   loginMcpOAuth: httpPost<{ success: boolean; error?: string }, { server_url: string }>('/api/mcp/oauth/login'),

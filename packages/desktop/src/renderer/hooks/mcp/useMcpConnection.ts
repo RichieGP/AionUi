@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { isBackendHttpError } from '@/common/adapter/httpBridge';
 import { mcpService } from '@/common/adapter/ipcBridge';
 import type { IMcpServer } from '@/common/config/storage';
+import { registerRuntimeRetry } from '@/renderer/runtime/runtimeStatusStore';
 import { globalMessageQueue } from './messageQueue';
 
 /**
@@ -143,6 +144,7 @@ export const useMcpConnection = (
   const handleTestMcpConnection = useCallback(
     async (server: IMcpServer, options?: TestOptions) => {
       const notify = options?.notify ?? true;
+      registerRuntimeRetry({ kind: 'mcp', id: server.id }, () => handleTestMcpConnection(server, options));
       setTestingServers((prev) => ({ ...prev, [server.id]: true }));
 
       // 更新服务器状态 - 使用统一的保存函数，避免竞态条件
@@ -160,7 +162,7 @@ export const useMcpConnection = (
       await updateServerStatus('testing');
 
       try {
-        const result = await mcpService.testMcpConnection.invoke(server);
+        const result = await mcpService.testMcpConnection.invoke({ ...server, runtime_scope_id: server.id });
         const needsAuth = result.needsAuth ?? result.needs_auth;
 
         // 检查是否需要认证

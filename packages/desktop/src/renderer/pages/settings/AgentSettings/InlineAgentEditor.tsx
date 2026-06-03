@@ -13,8 +13,9 @@ import EmojiPicker from '@/renderer/components/chat/EmojiPicker';
 import CodeMirror from '@uiw/react-codemirror';
 import { json } from '@codemirror/lang-json';
 import { useThemeContext } from '@/renderer/hooks/context/ThemeContext';
+import { registerRuntimeRetry } from '@/renderer/runtime/runtimeStatusStore';
 import { uuid } from '@/common/utils';
-import React, { useState, useCallback, useEffect, useRef } from 'react';
+import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 
 type TestStatus = 'idle' | 'testing' | 'success' | 'fail_cli' | 'fail_acp';
@@ -138,6 +139,7 @@ const InlineAgentEditor: React.FC<InlineAgentEditorProps> = ({ agent, onSave, on
   const isJsonEditingRef = useRef(false);
   const [testStatus, setTestStatus] = useState<TestStatus>('idle');
   const [testErrorDetail, setTestErrorDetail] = useState('');
+  const runtimeScopeId = useMemo(() => agent?.id || uuid(), [agent?.id]);
 
   // Canonical empty shape shown when the user has not filled anything yet.
   // Keep keys in sync with CustomAgentAdvancedOverrides.
@@ -244,6 +246,7 @@ const InlineAgentEditor: React.FC<InlineAgentEditorProps> = ({ agent, onSave, on
   const handleTestConnection = useCallback(async () => {
     setTestStatus('testing');
     setTestErrorDetail('');
+    registerRuntimeRetry({ kind: 'custom_agent', id: runtimeScopeId }, () => handleTestConnection());
     try {
       const parsedArgs = parseArgsString(argsString);
       const envObj = envVarsToObject(envVars);
@@ -251,6 +254,7 @@ const InlineAgentEditor: React.FC<InlineAgentEditorProps> = ({ agent, onSave, on
         command: command.trim(),
         acp_args: parsedArgs.length > 0 ? parsedArgs : undefined,
         env: Object.keys(envObj).length > 0 ? envObj : undefined,
+        runtime_scope_id: runtimeScopeId,
       });
       switch (result.step) {
         case 'success':
@@ -270,7 +274,7 @@ const InlineAgentEditor: React.FC<InlineAgentEditorProps> = ({ agent, onSave, on
       setTestStatus('fail_cli');
       setTestErrorDetail(error instanceof Error ? error.message : String(error));
     }
-  }, [command, argsString, envVars]);
+  }, [command, argsString, envVars, runtimeScopeId]);
 
   const handleSubmit = useCallback(() => {
     const parsedArgs = parseArgsString(argsString);

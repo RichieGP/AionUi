@@ -961,5 +961,23 @@
     "pendingCancel": "取消",
     "pendingTimeRemaining": "剩余时间：{{time}}"
   },
-  "retry": "重试"
+  "retry": "重试",
+  "runtimeStatus": {
+    "waitingForLock": "正在等待其他任务完成运行环境准备。",
+    "downloading": "正在下载托管 Node 运行环境。",
+    "extracting": "正在解压托管 Node 运行环境。",
+    "validating": "正在校验托管 Node 运行环境。",
+    "ready": "托管 Node 运行环境已准备完成。",
+    "failedTimeout": "托管 Node 运行环境准备超时，请重试。",
+    "failedDownload": "托管 Node 运行环境下载失败，请检查网络后重试。",
+    "failedHttp": "托管 Node 运行环境下载失败（HTTP {{status}}）。",
+    "failedValidation": "托管 Node 运行环境校验失败，请重试。",
+    "failedUnsupported": "当前平台暂不支持托管 Node 运行环境。",
+    "failedUnknown": "托管 Node 运行环境准备失败，请重试。"
+  },
+  "runtimeScope": {
+    "conversation": "对话",
+    "mcp": "MCP",
+    "customAgent": "自定义 Agent"
+  }
 }
