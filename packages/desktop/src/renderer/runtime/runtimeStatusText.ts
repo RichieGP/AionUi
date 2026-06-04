@@ -49,7 +49,6 @@ export function formatRuntimeScopeLabel(t: TFunction, scope: IRuntimeStatusScope
   }
 }
 
-
 function formatRuntimeResourceLabel(t: TFunction, status: IRuntimeStatusEvent): string {
   if (status.resource === 'acp_tool') {
     if (status.resource_id === 'codex-acp') {

@@ -112,7 +112,8 @@ function classifyIncompleteInstallation(details: ErrorWithDetails['details']): B
       missingBundledAioncoreDir || missingRuntimeDir || missingManagedResourcesDir
         ? 'missing_directory_resources'
         : 'missing_backend_binary',
-    missingBackendBinary: missingBundledAioncoreDir || missingRuntimeDir || missingManagedResourcesDir || missingRuntimeBinary,
+    missingBackendBinary:
+      missingBundledAioncoreDir || missingRuntimeDir || missingManagedResourcesDir || missingRuntimeBinary,
     missingBundledAioncoreDir,
     missingHubDir: getMissingDirectoryFlag(resourcesDirEntries, 'hub/'),
     missingPetStatesDir: getMissingDirectoryFlag(resourcesDirEntries, 'pet-states/'),

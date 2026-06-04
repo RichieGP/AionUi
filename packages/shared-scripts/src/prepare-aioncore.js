@@ -64,18 +64,14 @@ function prepareManagedResources(binaryPath, targetDir) {
   ensureDirectory(dataDir);
 
   console.log(`  Preparing managed resources under ${path.relative(process.cwd(), bundleOut)}`);
-  execFileSync(
-    binaryPath,
-    ['--data-dir', dataDir, 'prepare-managed-resources', '--bundle-out', bundleOut],
-    {
-      stdio: 'inherit',
-      env: {
-        ...process.env,
-        AIONUI_BUNDLED_MANAGED_RESOURCES: '',
-        AIONUI_DEV_MANAGED_RESOURCES: '',
-      },
-    }
-  );
+  execFileSync(binaryPath, ['--data-dir', dataDir, 'prepare-managed-resources', '--bundle-out', bundleOut], {
+    stdio: 'inherit',
+    env: {
+      ...process.env,
+      AIONUI_BUNDLED_MANAGED_RESOURCES: '',
+      AIONUI_DEV_MANAGED_RESOURCES: '',
+    },
+  });
 
   removeDirectorySafe(dataDir);
   return bundleOut;
