@@ -56,6 +56,7 @@ export type GuidSendDeps = {
   guidEnabledSkills: string[] | undefined;
   availableMcpServers: IMcpServer[];
   selectedMcpServerIds: string[] | undefined;
+  currentEffectiveAgentInfo: EffectiveAgentInfo;
   isGoogleAuth: boolean;
 
   // Mention state reset
@@ -105,6 +106,7 @@ export const useGuidSend = (deps: GuidSendDeps): GuidSendResult => {
     guidEnabledSkills,
     availableMcpServers,
     selectedMcpServerIds,
+    currentEffectiveAgentInfo: _currentEffectiveAgentInfo,
     isGoogleAuth,
     setMentionOpen,
     setMentionQuery,
