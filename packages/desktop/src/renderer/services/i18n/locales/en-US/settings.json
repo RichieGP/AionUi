@@ -973,11 +973,7 @@
     "failedValidation": "Validating {{resource}} failed. Try again.",
     "failedUnsupported": "{{resource}} is not supported on this platform.",
     "failedUnknown": "Preparing {{resource}} failed. Try again.",
-    "failedChecksum": "Verifying {{resource}} failed because the downloaded file was corrupted. Try again.",
-    "failedDownloadCertificate": "Downloading {{resource}} failed because the TLS certificate could not be verified. Check your proxy or system certificate settings and try again.",
-    "failedDownloadDns": "Downloading {{resource}} failed because the download host could not be resolved. Check your DNS or network settings and try again.",
-    "failedDownloadProxy": "Downloading {{resource}} failed because the proxy connection could not be established. Check your proxy settings and try again.",
-    "failedDownloadReset": "Downloading {{resource}} was interrupted because the connection was reset. Check your network and try again."
+    "failedChecksum": "Verifying {{resource}} failed because the downloaded file was corrupted. Try again."
   },
   "runtimeResource": {
     "node": "the managed Node runtime",
@@ -989,13 +985,5 @@
     "conversation": "Conversation",
     "mcp": "MCP",
     "customAgent": "Custom Agent"
-  },
-  "extraCaCerts": "Extra CA Certificates",
-  "extraCaCertsDesc": "Optional PEM/CRT/CER bundle for enterprise proxies or custom certificate authorities. Changes take effect after restart.",
-  "extraCaCertsSelect": "Select File",
-  "extraCaCertsClear": "Clear",
-  "extraCaCertsNotConfigured": "Not configured",
-  "extraCaCertsRestartConfirm": "Updating extra CA certificates will restart the application. Continue?",
-  "extraCaCertsUpdateFailed": "Failed to update extra CA certificates.",
-  "extraCaCertsFileFilter": "Certificate Files"
+  }
 }

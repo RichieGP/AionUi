@@ -62,7 +62,6 @@ export type BackendDirConfig = {
   cacheDir: string;
   workDir: string;
   logDir: string;
-  extraCaCertsPath?: string;
 };
 
 export type BackendLaunchOptions = {
@@ -190,18 +189,12 @@ export function buildSpawnArgs(config: SpawnConfig): string[] {
  * ProcessEnv('aionui.dir').
  */
 export function buildSpawnEnv(dirs: BackendDirConfig): NodeJS.ProcessEnv {
-  const env: NodeJS.ProcessEnv = {
+  return {
     ...process.env,
     AIONUI_CACHE_DIR: dirs.cacheDir,
     AIONUI_WORK_DIR: dirs.workDir,
     AIONUI_LOG_DIR: dirs.logDir,
   };
-  if (dirs.extraCaCertsPath && dirs.extraCaCertsPath.trim().length > 0) {
-    env.AIONUI_EXTRA_CA_CERTS = dirs.extraCaCertsPath;
-  } else {
-    delete env.AIONUI_EXTRA_CA_CERTS;
-  }
-  return env;
 }
 
 const FETCH_FORBIDDEN_PORTS = new Set([

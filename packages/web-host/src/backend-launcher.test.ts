@@ -155,12 +155,10 @@ describe('buildSpawnEnv', () => {
       cacheDir: '/c',
       workDir: '/w',
       logDir: '/l',
-      extraCaCertsPath: '/certs/extra.pem',
     });
     expect(env.AIONUI_CACHE_DIR).toBe('/c');
     expect(env.AIONUI_WORK_DIR).toBe('/w');
     expect(env.AIONUI_LOG_DIR).toBe('/l');
-    expect(env.AIONUI_EXTRA_CA_CERTS).toBe('/certs/extra.pem');
     expect(env.PATH).toBe(process.env.PATH); // inherits
   });
 });
@@ -281,7 +279,6 @@ describe('BackendLifecycleManager.start (success path)', () => {
       expect(opts.env.AIONUI_CACHE_DIR).toBe('/c');
       expect(opts.env.AIONUI_WORK_DIR).toBe('/w');
       expect(opts.env.AIONUI_LOG_DIR).toBe('/l');
-      expect(opts.env.AIONUI_EXTRA_CA_CERTS).toBeUndefined();
       expect((spawnCall[2] as { detached?: boolean }).detached).toBe(process.platform !== 'win32');
 
       expect(fetchSpy).toHaveBeenCalled();

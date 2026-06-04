@@ -1109,8 +1109,6 @@ export const systemSettings = {
   setAutoPreviewOfficeFiles: httpPut<void, { enabled: boolean }>('/api/settings/client', (p) => ({
     autoPreviewOfficeFiles: p.enabled,
   })),
-  getExtraCaCertsPath: bridge.buildProvider<string | undefined, void>('system-settings:get-extra-ca-certs-path'),
-  setExtraCaCertsPath: bridge.buildProvider<void, { path?: string }>('system-settings:set-extra-ca-certs-path'),
   getPetEnabled: bridge.buildProvider<boolean, void>('system-settings:get-pet-enabled'),
   setPetEnabled: bridge.buildProvider<void, { enabled: boolean }>('system-settings:set-pet-enabled'),
   getPetSize: bridge.buildProvider<number, void>('system-settings:get-pet-size'),

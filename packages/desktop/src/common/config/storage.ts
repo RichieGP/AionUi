@@ -91,10 +91,6 @@ export interface IConfigStorageRefer {
   'system.keepAwake'?: boolean;
   // Automatically preview newly created Office files in the current workspace
   'system.autoPreviewOfficeFiles'?: boolean;
-  // Optional PEM/CRT/CER bundle used to extend the backend HTTP trust store
-  // in enterprise proxy / custom CA environments. Stored locally because the
-  // backend needs it before /api/settings/client is available.
-  'system.extraCaCertsPath'?: string;
   // Telegram assistant default model / Telegram 助手默认模型
   'assistant.telegram.defaultModel'?: {
     id: string;

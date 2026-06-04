@@ -974,11 +974,7 @@
     "failedValidation": "{{resource}} 校验失败，请重试。",
     "failedUnsupported": "当前平台暂不支持 {{resource}}。",
     "failedUnknown": "{{resource}} 准备失败，请重试。",
-    "failedChecksum": "校验 {{resource}} 失败，下载文件可能已损坏。请重试。",
-    "failedDownloadCertificate": "{{resource}} 下载失败，TLS 证书校验未通过。请检查代理或系统证书设置后重试。",
-    "failedDownloadDns": "{{resource}} 下载失败，无法解析下载地址。请检查 DNS 或网络设置后重试。",
-    "failedDownloadProxy": "{{resource}} 下载失败，代理连接未建立成功。请检查代理设置后重试。",
-    "failedDownloadReset": "{{resource}} 下载过程中连接被重置。请检查网络后重试。"
+    "failedChecksum": "校验 {{resource}} 失败，下载文件可能已损坏。请重试。"
   },
   "runtimeResource": {
     "node": "托管 Node 运行环境",
@@ -990,13 +986,5 @@
     "conversation": "对话",
     "mcp": "MCP",
     "customAgent": "自定义 Agent"
-  },
-  "extraCaCerts": "额外 CA 证书",
-  "extraCaCertsDesc": "用于企业代理或自定义证书机构的可选 PEM/CRT/CER 证书包。修改后会在重启后生效。",
-  "extraCaCertsSelect": "选择文件",
-  "extraCaCertsClear": "清除",
-  "extraCaCertsNotConfigured": "未配置",
-  "extraCaCertsRestartConfirm": "更新额外 CA 证书后将重启应用，是否继续？",
-  "extraCaCertsUpdateFailed": "更新额外 CA 证书失败。",
-  "extraCaCertsFileFilter": "证书文件"
+  }
 }

@@ -52,7 +52,6 @@ const SystemModalContent: React.FC = () => {
   const [agentIdleTimeout, setAgentIdleTimeout] = useState<number>(5);
   const [saveUploadToWorkspace, setSaveUploadToWorkspace] = useState(false);
   const [autoPreviewOfficeFiles, setAutoPreviewOfficeFiles] = useState(true);
-  const [extraCaCertsPath, setExtraCaCertsPath] = useState<string | undefined>();
 
   useEffect(() => {
     if (!isDesktop) {
@@ -93,14 +92,6 @@ const SystemModalContent: React.FC = () => {
     setCronNotificationEnabled(configService.get('system.cronNotificationEnabled') ?? false);
     setSaveUploadToWorkspace(configService.get('upload.saveToWorkspace') ?? false);
     setAutoPreviewOfficeFiles(configService.get('system.autoPreviewOfficeFiles') ?? true);
-    if (isDesktop) {
-      ipcBridge.systemSettings.getExtraCaCertsPath
-        .invoke()
-        .then((value) => {
-          setExtraCaCertsPath(value);
-        })
-        .catch(() => {});
-    }
     const pt = configService.get('acp.promptTimeout');
     if (pt && pt > 0) setPromptTimeout(pt);
     const ait = configService.get('acp.agentIdleTimeout');
@@ -244,49 +235,6 @@ const SystemModalContent: React.FC = () => {
     });
   }, []);
 
-  const confirmExtraCaCertsChange = useCallback(() => {
-    return new Promise<void>((resolve, reject) => {
-      modal.confirm({
-        title: t('settings.updateConfirm'),
-        content: t('settings.extraCaCertsRestartConfirm'),
-        onOk: () => resolve(),
-        onCancel: () => reject(new Error('cancelled')),
-      });
-    });
-  }, [modal, t]);
-
-  const handleSelectExtraCaCerts = useCallback(async () => {
-    if (!isDesktop) return;
-    try {
-      const selected = await ipcBridge.dialog.showOpen.invoke({
-        properties: ['openFile'],
-        filters: [{ name: t('settings.extraCaCertsFileFilter'), extensions: ['pem', 'crt', 'cer'] }],
-      });
-      const nextPath = selected?.[0];
-      if (!nextPath || nextPath === extraCaCertsPath) return;
-      await confirmExtraCaCertsChange();
-      await ipcBridge.systemSettings.setExtraCaCertsPath.invoke({ path: nextPath });
-      setExtraCaCertsPath(nextPath);
-      await ipcBridge.application.restart.invoke();
-    } catch (error) {
-      if (error instanceof Error && error.message === 'cancelled') return;
-      Message.error(error instanceof Error ? error.message : t('settings.extraCaCertsUpdateFailed'));
-    }
-  }, [confirmExtraCaCertsChange, extraCaCertsPath, isDesktop, t]);
-
-  const handleClearExtraCaCerts = useCallback(async () => {
-    if (!isDesktop || !extraCaCertsPath) return;
-    try {
-      await confirmExtraCaCertsChange();
-      await ipcBridge.systemSettings.setExtraCaCertsPath.invoke({ path: undefined });
-      setExtraCaCertsPath(undefined);
-      await ipcBridge.application.restart.invoke();
-    } catch (error) {
-      if (error instanceof Error && error.message === 'cancelled') return;
-      Message.error(error instanceof Error ? error.message : t('settings.extraCaCertsUpdateFailed'));
-    }
-  }, [confirmExtraCaCertsChange, extraCaCertsPath, isDesktop, t]);
-
   // Get system directory info
   const { data: systemInfo } = useSWR('system.dir.info', () => ipcBridge.application.systemInfo.invoke());
 
@@ -383,31 +331,6 @@ const SystemModalContent: React.FC = () => {
       label: t('settings.autoPreviewOfficeFiles'),
       description: t('settings.autoPreviewOfficeFilesDesc'),
       component: <Switch checked={autoPreviewOfficeFiles} onChange={handleAutoPreviewOfficeFilesChange} />,
-    },
-    {
-      key: 'extraCaCertsPath',
-      label: t('settings.extraCaCerts'),
-      description: t('settings.extraCaCertsDesc'),
-      component: (
-        <div className='flex items-center gap-8px max-w-420px'>
-          <Tooltip
-            content={extraCaCertsPath || t('settings.extraCaCertsNotConfigured')}
-            position='top'
-          >
-            <div className='max-w-220px truncate text-12px text-t-tertiary'>
-              {extraCaCertsPath || t('settings.extraCaCertsNotConfigured')}
-            </div>
-          </Tooltip>
-          <Button size='small' onClick={handleSelectExtraCaCerts}>
-            {t('settings.extraCaCertsSelect')}
-          </Button>
-          {extraCaCertsPath ? (
-            <Button size='small' status='danger' onClick={handleClearExtraCaCerts}>
-              {t('settings.extraCaCertsClear')}
-            </Button>
-          ) : null}
-        </div>
-      ),
     },
   ];
 

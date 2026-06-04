@@ -61,15 +61,6 @@ export function initSystemSettingsBridge(): void {
     }
   });
 
-  ipcBridge.systemSettings.getExtraCaCertsPath.provider(async () => {
-    const value = await ProcessConfig.get('system.extraCaCertsPath');
-    return value ?? undefined;
-  });
-
-  ipcBridge.systemSettings.setExtraCaCertsPath.provider(async ({ path }) => {
-    await ProcessConfig.set('system.extraCaCertsPath', path?.trim() ? path : undefined);
-  });
-
   // 语言变更通知，同步主进程 i18n 并通知托盘重建
   // Language change notification, sync main process i18n and notify tray rebuild
   ipcBridge.systemSettings.changeLanguage.provider(async ({ language }) => {

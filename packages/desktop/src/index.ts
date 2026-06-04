@@ -553,7 +553,6 @@ const handleAppReady = async (): Promise<void> => {
           cacheDir: sysDir.cacheDir,
           workDir: sysDir.workDir,
           logDir: sysDir.logDir,
-          extraCaCertsPath: sysDir.extraCaCertsPath,
         },
         {
           allowPendingOnHealthTimeout: !(isWebUIMode || isResetPasswordMode),

@@ -439,7 +439,6 @@ export const getSystemDir = () => {
     // getDataPath() 返回 CLI 安全路径（macOS 上的符号链接）以避免空格问题
     workDir: dirConfig?.workDir || getDataPath(),
     logDir,
-    extraCaCertsPath: configFile.getSync('system.extraCaCertsPath'),
     platform: process.platform as PlatformType,
     arch: process.arch as ArchitectureType,
   };

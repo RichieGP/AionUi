@@ -22,47 +22,6 @@ function appendProgressSuffix(text: string, progress: string): string {
   return `${trimmed} (${progress})`;
 }
 
-type DownloadFailureDetail = 'certificate' | 'dns' | 'proxy' | 'connection_reset' | null;
-
-function detectDownloadFailureDetail(message?: string | null): DownloadFailureDetail {
-  if (!message) {
-    return null;
-  }
-
-  const normalized = message.toLowerCase();
-  if (
-    normalized.includes('certificate verify failed') ||
-    normalized.includes('self-signed certificate') ||
-    normalized.includes('invalid peer certificate') ||
-    normalized.includes('unknownissuer') ||
-    normalized.includes('certificate has expired')
-  ) {
-    return 'certificate';
-  }
-  if (
-    normalized.includes('dns error') ||
-    normalized.includes('failed to lookup address information') ||
-    normalized.includes('temporary failure in name resolution') ||
-    normalized.includes('name or service not known') ||
-    normalized.includes('nodename nor servname provided')
-  ) {
-    return 'dns';
-  }
-  if (normalized.includes('proxy') || normalized.includes('proxy connect') || normalized.includes('tunnel')) {
-    return 'proxy';
-  }
-  if (
-    normalized.includes('connection reset') ||
-    normalized.includes('connection closed') ||
-    normalized.includes('broken pipe') ||
-    normalized.includes('unexpected eof') ||
-    normalized.includes('connection aborted')
-  ) {
-    return 'connection_reset';
-  }
-  return null;
-}
-
 export function formatRuntimeScopeLabel(t: TFunction, scope: IRuntimeStatusScope): string {
   switch (scope.kind) {
     case 'conversation':
@@ -73,6 +32,7 @@ export function formatRuntimeScopeLabel(t: TFunction, scope: IRuntimeStatusScope
       return t('settings.runtimeScope.customAgent', { defaultValue: 'Custom Agent' });
   }
 }
+
 
 function formatRuntimeResourceLabel(t: TFunction, status: IRuntimeStatusEvent): string {
   if (status.resource === 'acp_tool') {
@@ -128,37 +88,10 @@ export function formatRuntimeStatusText(t: TFunction, status: IRuntimeStatusEven
             defaultValue: 'Preparing {{resource}} timed out. Try again.',
           });
         case 'download_failed':
-          switch (detectDownloadFailureDetail(status.message)) {
-            case 'certificate':
-              return t('settings.runtimeStatus.failedDownloadCertificate', {
-                resource,
-                defaultValue:
-                  'Downloading {{resource}} failed because the TLS certificate could not be verified. Check your proxy or system certificate settings and try again.',
-              });
-            case 'dns':
-              return t('settings.runtimeStatus.failedDownloadDns', {
-                resource,
-                defaultValue:
-                  'Downloading {{resource}} failed because the download host could not be resolved. Check your DNS or network settings and try again.',
-              });
-            case 'proxy':
-              return t('settings.runtimeStatus.failedDownloadProxy', {
-                resource,
-                defaultValue:
-                  'Downloading {{resource}} failed because the proxy connection could not be established. Check your proxy settings and try again.',
-              });
-            case 'connection_reset':
-              return t('settings.runtimeStatus.failedDownloadReset', {
-                resource,
-                defaultValue:
-                  'Downloading {{resource}} was interrupted because the connection was reset. Check your network and try again.',
-              });
-            default:
-              return t('settings.runtimeStatus.failedDownload', {
-                resource,
-                defaultValue: 'Downloading {{resource}} failed. Check your network and try again.',
-              });
-          }
+          return t('settings.runtimeStatus.failedDownload', {
+            resource,
+            defaultValue: 'Downloading {{resource}} failed. Check your network and try again.',
+          });
         case 'http_status':
           return t('settings.runtimeStatus.failedHttp', {
             resource,
