@@ -25,7 +25,6 @@ vi.mock('@/common', () => ({
     },
     fs: {
       readAssistantRule: { invoke: vi.fn() },
-      readAssistantSkill: { invoke: vi.fn() },
       listAvailableSkills: { invoke: vi.fn() },
       listBuiltinAutoSkills: { invoke: vi.fn() },
       writeAssistantRule: { invoke: vi.fn() },
