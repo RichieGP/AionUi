@@ -64,6 +64,8 @@ describe('AssistantListPanel', () => {
   it('renders without crashing (smoke)', () => {
     const { container } = renderWithProviders(<AssistantListPanel {...defaultProps} />);
     expect(container.querySelector('[data-testid="btn-create-assistant"]')).toBeInTheDocument();
+    expect(screen.getByTestId('assistant-list-shell')).toBeInTheDocument();
+    expect(screen.getByTestId('assistant-card-1')).toBeInTheDocument();
   });
 
   it('renders with empty assistants list (props branch)', () => {
@@ -106,8 +108,9 @@ describe('AssistantListPanel', () => {
     expect(onToggleSpy).toHaveBeenCalledTimes(1);
   });
 
-  it('renders search toggle button (props branch)', () => {
+  it('renders the single-list layout without legacy filter tabs', () => {
     renderWithProviders(<AssistantListPanel {...defaultProps} />);
-    expect(screen.getByTestId('btn-search-toggle')).toBeInTheDocument();
+    expect(screen.queryByText('settings.assistantFilterAll')).not.toBeInTheDocument();
+    expect(screen.queryByText('settings.assistantSectionEnabled')).not.toBeInTheDocument();
   });
 });

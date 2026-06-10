@@ -76,5 +76,7 @@ describe('AssistantEditorPage', () => {
     );
 
     expect(screen.getAllByTestId('assistant-editor-page')).toHaveLength(1);
+    expect(screen.getByTestId('assistant-editor-bar')).toBeInTheDocument();
+    expect(screen.getByTestId('assistant-editor-body')).toBeInTheDocument();
   });
 });

@@ -24,6 +24,18 @@ type UseAssistantEditorParams = {
 
 const isBuiltinAssistant = (assistant: Assistant | null | undefined): boolean => assistant?.source === 'builtin';
 
+const resolveLocalizedRecommendedPrompts = (
+  detail: Awaited<ReturnType<typeof ipcBridge.assistants.get.invoke>>,
+  localeKey: string
+): string[] => {
+  return (
+    detail.prompts.recommended_i18n?.[localeKey] ??
+    detail.prompts.recommended_i18n?.['en-US'] ??
+    detail.prompts.recommended ??
+    []
+  );
+};
+
 /**
  * Manages all assistant editing state and handlers:
  * create, edit, duplicate, save, delete, and toggle enabled.
@@ -129,7 +141,7 @@ export const useAssistantEditor = ({
       setEditAvatar(detail.profile.avatar || '');
       setEditAgent(detail.engine.agent_backend || assistant.preset_agent_type || 'claude');
       setEditContext(detail.rules.content || '');
-      setEditRecommendedPromptsText((detail.prompts.recommended ?? []).join('\n'));
+      setEditRecommendedPromptsText(resolveLocalizedRecommendedPrompts(detail, localeKey).join('\n'));
       setDefaultModelMode(detail.defaults.model.mode === 'fixed' ? 'fixed' : 'auto');
       setDefaultModelValue(detail.defaults.model.value || '');
       setDefaultPermissionMode(detail.defaults.permission.mode === 'fixed' ? 'fixed' : 'auto');
@@ -199,7 +211,7 @@ export const useAssistantEditor = ({
     try {
       const { detail, skillsList, autoSkills, mcpServers } = await loadEditorResources(assistant.id);
       setEditContext(detail.rules.content || '');
-      setEditRecommendedPromptsText((detail.prompts.recommended ?? []).join('\n'));
+      setEditRecommendedPromptsText(resolveLocalizedRecommendedPrompts(detail, localeKey).join('\n'));
       setDefaultModelMode(detail.defaults.model.mode === 'fixed' ? 'fixed' : 'auto');
       setDefaultModelValue(detail.defaults.model.value || '');
       setDefaultPermissionMode(detail.defaults.permission.mode === 'fixed' ? 'fixed' : 'auto');

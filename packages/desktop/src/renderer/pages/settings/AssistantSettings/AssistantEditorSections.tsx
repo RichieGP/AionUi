@@ -5,9 +5,9 @@ import { useModelProviderList } from '@/renderer/hooks/agent/useModelProviderLis
 import EmojiPicker from '@/renderer/components/chat/EmojiPicker';
 import MarkdownView from '@/renderer/components/Markdown';
 import { getAgentModes } from '@/renderer/utils/model/agentModes';
-import { Avatar, Button, Checkbox, Collapse, Input, Select, Tag, Typography } from '@arco-design/web-react';
-import { Delete, Info, Plus, Robot } from '@icon-park/react';
-import React, { useEffect, useRef, useState } from 'react';
+import { Avatar, Button, Input, Select, Tag } from '@arco-design/web-react';
+import { Info, Robot } from '@icon-park/react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 
@@ -58,6 +58,79 @@ export type AssistantEditorSectionsProps = {
   handleDuplicate: (assistant: AssistantListItem) => void;
 };
 
+type SectionCardProps = {
+  title: string;
+  legend?: { label: string; tone: 'now' | 'next' };
+  readOnly?: boolean;
+  readOnlyLabel: string;
+  extra?: React.ReactNode;
+  testId?: string;
+  children: React.ReactNode;
+};
+
+const SectionCard: React.FC<SectionCardProps> = ({
+  title,
+  legend,
+  readOnly,
+  readOnlyLabel,
+  extra,
+  testId,
+  children,
+}) => {
+  return (
+    <section data-testid={testId} className='rounded-12px border border-border-2 bg-bg-0 p-16px'>
+      <div className='mb-12px flex items-center gap-8px'>
+        <div className='text-12px font-600 uppercase tracking-[0.05em] text-t-tertiary'>{title}</div>
+        {legend ? (
+          <span
+            className={`rounded-6px px-8px py-2px text-10px font-500 ${
+              legend.tone === 'now'
+                ? 'bg-[rgba(var(--success-6),0.12)] text-[rgb(var(--success-6))]'
+                : 'bg-[rgba(var(--warning-6),0.12)] text-[rgb(var(--warning-6))]'
+            }`}
+          >
+            {legend.label}
+          </span>
+        ) : null}
+        {readOnly ? (
+          <span className='ml-auto rounded-6px bg-fill-1 px-8px py-2px text-10px font-500 text-t-tertiary'>
+            {readOnlyLabel}
+          </span>
+        ) : null}
+        {extra ? <div className='ml-auto'>{extra}</div> : null}
+      </div>
+      {children}
+    </section>
+  );
+};
+
+const FieldLabel: React.FC<{ children: React.ReactNode; required?: boolean }> = ({ children, required = false }) => {
+  return (
+    <div className='w-86px flex-shrink-0 text-13px text-t-secondary'>
+      {required ? <span className='mr-4px text-[rgb(var(--danger-6))]'>*</span> : null}
+      {children}
+    </div>
+  );
+};
+
+type ConfigRowProps = {
+  label: string;
+  children: React.ReactNode;
+  hint?: React.ReactNode;
+};
+
+const ConfigRow: React.FC<ConfigRowProps> = ({ label, children, hint }) => {
+  return (
+    <div className='flex items-start gap-12px'>
+      <FieldLabel>{label}</FieldLabel>
+      <div className='min-w-0 flex-1 space-y-8px'>
+        {children}
+        {hint ? <div className='text-11px leading-18px text-t-tertiary'>{hint}</div> : null}
+      </div>
+    </div>
+  );
+};
+
 const AssistantEditorSections: React.FC<AssistantEditorSectionsProps> = ({
   isCreating,
   editName,
@@ -94,8 +167,8 @@ const AssistantEditorSections: React.FC<AssistantEditorSectionsProps> = ({
   selectedSkills,
   setSelectedSkills,
   pendingSkills,
-  setDeletePendingSkillName,
-  setDeleteCustomSkillName,
+  setDeletePendingSkillName: _setDeletePendingSkillName,
+  setDeleteCustomSkillName: _setDeleteCustomSkillName,
   builtinAutoSkills,
   disabledBuiltinSkills,
   setDisabledBuiltinSkills,
@@ -109,61 +182,28 @@ const AssistantEditorSections: React.FC<AssistantEditorSectionsProps> = ({
   const { providers, getAvailableModels } = useModelProviderList();
   const textareaWrapperRef = useRef<HTMLDivElement>(null);
   const [rulesExpanded, setRulesExpanded] = useState(false);
+  const [addingPrompt, setAddingPrompt] = useState(false);
+  const [newPromptDraft, setNewPromptDraft] = useState('');
+  const [editingPromptIndex, setEditingPromptIndex] = useState<number | null>(null);
+  const [editingPromptDraft, setEditingPromptDraft] = useState('');
 
   useEffect(() => {
-    if (promptViewMode === 'edit') {
-      const timer = setTimeout(() => {
-        const textarea = textareaWrapperRef.current?.querySelector('textarea');
-        textarea?.focus();
-      }, 100);
-      return () => clearTimeout(timer);
-    }
+    if (promptViewMode !== 'edit') return;
+    const timer = setTimeout(() => {
+      const textarea = textareaWrapperRef.current?.querySelector('textarea');
+      textarea?.focus();
+    }, 100);
+    return () => clearTimeout(timer);
   }, [promptViewMode]);
 
-  const showSkills = isCreating || (activeAssistant !== null && activeAssistant.source !== 'extension');
-  const customSkillItems = availableSkills.filter((skill) => skill.source === 'custom');
-  const builtinSkillItems = availableSkills.filter((skill) => skill.source === 'builtin');
-  const extensionSkillItems = availableSkills.filter((skill) => skill.source === 'extension');
-  const customActiveCount = selectedSkills.filter(
-    (name) =>
-      pendingSkills.some((skill) => skill.name === name) || customSkillItems.some((skill) => skill.name === name)
-  ).length;
-  const builtinActiveCount = selectedSkills.filter((name) =>
-    builtinSkillItems.some((skill) => skill.name === name)
-  ).length;
-  const extensionActiveCount = selectedSkills.filter((name) =>
-    extensionSkillItems.some((skill) => skill.name === name)
-  ).length;
-  const autoInjectedActiveCount = builtinAutoSkills.filter(
-    (skill) => !disabledBuiltinSkills.includes(skill.name)
-  ).length;
-  const customStatusDotColor = customActiveCount > 0 ? 'rgb(var(--success-6))' : 'var(--color-text-4)';
-  const builtinStatusDotColor = builtinActiveCount > 0 ? 'rgb(var(--success-6))' : 'var(--color-text-4)';
-  const extensionStatusDotColor = extensionActiveCount > 0 ? 'rgb(var(--success-6))' : 'var(--color-text-4)';
-  const autoInjectedStatusDotColor = autoInjectedActiveCount > 0 ? 'rgb(var(--success-6))' : 'var(--color-text-4)';
-  const totalSkillsCount =
-    pendingSkills.length +
-    customSkillItems.length +
-    builtinSkillItems.length +
-    extensionSkillItems.length +
-    builtinAutoSkills.length;
-  const totalActiveSkillsCount =
-    selectedSkills.filter(
-      (name) =>
-        pendingSkills.some((skill) => skill.name === name) || availableSkills.some((skill) => skill.name === name)
-    ).length + autoInjectedActiveCount;
   const isBuiltin = activeAssistant?.source === 'builtin';
   const isExtension = activeAssistant?.source === 'extension';
-  const isRuleEditable = !isBuiltin && !isExtension;
-  const isSkillsEditable = isCreating || (!isBuiltin && !isExtension);
   const isProfileEditable = !isBuiltin && !isExtension;
   const isAgentEditable = !isExtension;
   const isDefaultsEditable = !isBuiltin && !isExtension;
-  const rulesContainerHeight = rulesExpanded
-    ? '420px'
-    : isRuleEditable && promptViewMode === 'edit'
-      ? '260px'
-      : '220px';
+  const isRuleEditable = !isBuiltin && !isExtension;
+  const showSkills = isCreating || (activeAssistant !== null && activeAssistant.source !== 'extension');
+
   const modelOptions = providers.flatMap((provider) =>
     getAvailableModels(provider).map((modelName) => ({
       key: `${provider.id}-${modelName}`,
@@ -173,62 +213,178 @@ const AssistantEditorSections: React.FC<AssistantEditorSectionsProps> = ({
   );
   const permissionOptions = getAgentModes(editAgent);
   const enabledMcpServers = availableMcpServers.filter((server) => server.enabled !== false);
+  const recommendedPromptItems = useMemo(
+    () =>
+      editRecommendedPromptsText
+        .split('\n')
+        .map((item) => item.trim())
+        .filter(Boolean),
+    [editRecommendedPromptsText]
+  );
+  const readOnlyLabel = t('common.readOnly', { defaultValue: 'Read only' });
+  const rulesContainerHeight = rulesExpanded ? '440px' : promptViewMode === 'edit' ? '280px' : '240px';
+  const autoSkillNames = builtinAutoSkills.map((skill) => skill.name);
+  const autoDefaultOptionLabel = t('settings.assistantSelectAutoRememberLastUsed', {
+    defaultValue: 'Unset (remember last used automatically)',
+  });
+  const selectedItemsLabel = (count: number) =>
+    t('settings.assistantSelectedCount', {
+      defaultValue: 'Selected {{count}} items',
+      count,
+    });
+  const editableSkillOptions = useMemo(() => {
+    const optionMap = new Map<
+      string,
+      { value: string; label: string; sourceLabel?: string; isAuto?: boolean; disabled?: boolean }
+    >();
+
+    pendingSkills.forEach((skill) => {
+      optionMap.set(skill.name, { value: skill.name, label: skill.name, sourceLabel: 'Pending' });
+    });
+
+    availableSkills.forEach((skill) => {
+      optionMap.set(skill.name, {
+        value: skill.name,
+        label: skill.name,
+        sourceLabel:
+          skill.source === 'builtin'
+            ? t('settings.builtinSkills', { defaultValue: 'Builtin Skills' })
+            : skill.source === 'extension'
+              ? t('settings.extensionSkillsBadge', { defaultValue: 'Extension' })
+              : t('settings.skillsHub.custom', { defaultValue: 'Custom' }),
+      });
+    });
+
+    builtinAutoSkills.forEach((skill) => {
+      optionMap.set(skill.name, {
+        value: skill.name,
+        label: skill.name,
+        sourceLabel: t('settings.autoInjectedSkillsBadge', { defaultValue: 'Auto' }),
+        isAuto: true,
+      });
+    });
+
+    return Array.from(optionMap.values());
+  }, [availableSkills, builtinAutoSkills, pendingSkills, t]);
+  const selectedSkillValues = useMemo(
+    () =>
+      Array.from(
+        new Set([
+          ...selectedSkills,
+          ...builtinAutoSkills
+            .filter((skill) => !disabledBuiltinSkills.includes(skill.name))
+            .map((skill) => skill.name),
+        ])
+      ),
+    [builtinAutoSkills, disabledBuiltinSkills, selectedSkills]
+  );
+
+  const applyPromptItems = (items: string[]) => {
+    setEditRecommendedPromptsText(items.join('\n'));
+  };
+
+  const handleBeginPromptEdit = (index: number) => {
+    setEditingPromptIndex(index);
+    setEditingPromptDraft(recommendedPromptItems[index] ?? '');
+  };
+
+  const handleSavePromptEdit = () => {
+    if (editingPromptIndex === null) return;
+    const trimmed = editingPromptDraft.trim();
+    if (!trimmed) return;
+    const nextItems = [...recommendedPromptItems];
+    nextItems[editingPromptIndex] = trimmed;
+    applyPromptItems(nextItems);
+    setEditingPromptIndex(null);
+    setEditingPromptDraft('');
+  };
+
+  const handleDeletePrompt = (index: number) => {
+    applyPromptItems(recommendedPromptItems.filter((_, promptIndex) => promptIndex !== index));
+    if (editingPromptIndex === index) {
+      setEditingPromptIndex(null);
+      setEditingPromptDraft('');
+    }
+  };
+
+  const handleAddPrompt = () => {
+    const trimmed = newPromptDraft.trim();
+    if (!trimmed) return;
+    applyPromptItems([...recommendedPromptItems, trimmed]);
+    setAddingPrompt(false);
+    setNewPromptDraft('');
+  };
+
+  const handleSkillSelectionChange = (values: string[]) => {
+    const nextSelected = values.filter((value) => !autoSkillNames.includes(value));
+    const nextDisabledAuto = autoSkillNames.filter((skillName) => !values.includes(skillName));
+    setSelectedSkills(nextSelected);
+    setDisabledBuiltinSkills(nextDisabledAuto);
+  };
 
   return (
-    <div className='flex flex-col gap-16px bg-fill-2 rounded-16px p-20px'>
-      {isBuiltin && activeAssistant && (
+    <div className='flex flex-col gap-12px pb-24px'>
+      {isBuiltin && activeAssistant ? (
         <div
-          className='flex items-start gap-8px p-12px rd-8px bg-[rgba(var(--primary-6),0.06)] border border-solid border-[rgba(var(--primary-6),0.18)]'
+          className='rounded-10px border border-[rgba(var(--primary-6),0.18)] bg-[rgba(var(--primary-6),0.06)] px-14px py-12px text-13px leading-20px text-primary-7'
           data-testid='assistant-builtin-readonly-banner'
         >
-          <Info theme='outline' size={16} className='mt-2px text-primary-6 flex-shrink-0' />
-          <div className='text-13px leading-20px text-t-primary'>
-            <span>
-              {t('settings.assistantBuiltinReadonlyTip', {
-                defaultValue:
-                  'This is a builtin assistant. Only Main Agent can be changed. To customize other fields, ',
-              })}
-            </span>
-            <Button
-              type='text'
-              size='mini'
-              className='!px-0 !text-primary-6 hover:!text-primary-7'
-              onClick={(event) => {
-                event.preventDefault();
-                handleDuplicate(activeAssistant);
-              }}
-              data-testid='link-duplicate-from-banner'
-            >
-              {t('settings.assistantBuiltinReadonlyDuplicateLink', { defaultValue: 'duplicate it' })}
-            </Button>
-            <span>{t('settings.assistantBuiltinReadonlyTipSuffix', { defaultValue: '.' })}</span>
+          <div className='flex items-start gap-8px'>
+            <Info theme='outline' size={16} className='mt-2px flex-shrink-0 text-primary-6' />
+            <div>
+              <span>
+                {t('settings.assistantBuiltinReadonlyTip', {
+                  defaultValue:
+                    'This is a builtin assistant. Only Main Agent can be changed. To customize other fields, ',
+                })}
+              </span>
+              <Button
+                type='text'
+                size='mini'
+                className='!px-0 !text-primary-6 hover:!text-primary-7'
+                onClick={(event) => {
+                  event.preventDefault();
+                  handleDuplicate(activeAssistant);
+                }}
+                data-testid='link-duplicate-from-banner'
+              >
+                {t('settings.assistantBuiltinReadonlyDuplicateLink', { defaultValue: 'duplicate it' })}
+              </Button>
+              <span>{t('settings.assistantBuiltinReadonlyTipSuffix', { defaultValue: '.' })}</span>
+            </div>
           </div>
         </div>
-      )}
+      ) : null}
 
-      <div className='flex-shrink-0'>
-        <Typography.Text bold>
-          <span className='text-red-500'>*</span> {t('settings.assistantNameAvatar', { defaultValue: 'Name & Avatar' })}
-        </Typography.Text>
-        <div className='mt-10px flex items-center gap-12px'>
+      <SectionCard
+        title={t('settings.assistantIdentitySection', { defaultValue: 'Identity' })}
+        legend={{
+          label: t('settings.assistantEffectiveImmediately', { defaultValue: 'Applies immediately' }),
+          tone: 'now',
+        }}
+        readOnly={isBuiltin || isExtension}
+        readOnlyLabel={readOnlyLabel}
+        testId='assistant-card-identity'
+      >
+        <div className='flex items-start gap-14px'>
           {!isProfileEditable ? (
-            <Avatar shape='square' size={40} className='bg-bg-1 rounded-4px'>
+            <Avatar shape='square' size={42} className='!rounded-10px bg-fill-1'>
               {editAvatarImage ? (
                 <img src={editAvatarImage} alt='' width={24} height={24} style={{ objectFit: 'contain' }} />
               ) : editAvatar ? (
-                <span className='text-24px'>{editAvatar}</span>
+                <span className='text-20px'>{editAvatar}</span>
               ) : (
                 <Robot theme='outline' size={20} />
               )}
             </Avatar>
           ) : (
             <EmojiPicker value={editAvatar} onChange={(emoji) => setEditAvatar(emoji)} placement='br'>
-              <Button type='text' className='!p-0 !min-w-0 h-auto'>
-                <Avatar shape='square' size={40} className='bg-bg-1 rounded-4px hover:bg-fill-2 transition-colors'>
+              <Button type='text' className='!h-42px !w-42px !rounded-10px !bg-fill-1 !p-0'>
+                <Avatar shape='square' size={42} className='!rounded-10px bg-fill-1'>
                   {editAvatarImage ? (
                     <img src={editAvatarImage} alt='' width={24} height={24} style={{ objectFit: 'contain' }} />
                   ) : editAvatar ? (
-                    <span className='text-24px'>{editAvatar}</span>
+                    <span className='text-20px'>{editAvatar}</span>
                   ) : (
                     <Robot theme='outline' size={20} />
                   )}
@@ -236,119 +392,283 @@ const AssistantEditorSections: React.FC<AssistantEditorSectionsProps> = ({
               </Button>
             </EmojiPicker>
           )}
-          <Input
-            value={editName}
-            onChange={(value) => setEditName(value)}
-            disabled={!isProfileEditable}
-            placeholder={t('settings.agentNamePlaceholder', { defaultValue: 'Enter a name for this agent' })}
-            data-testid='input-assistant-name'
-            className='flex-1 rounded-4px bg-bg-1'
-          />
+          <div className='min-w-0 flex-1 space-y-10px'>
+            <div className='flex items-center gap-12px'>
+              <FieldLabel required>{t('settings.assistantName', { defaultValue: 'Name' })}</FieldLabel>
+              <Input
+                value={editName}
+                onChange={(value) => setEditName(value)}
+                disabled={!isProfileEditable}
+                placeholder={t('settings.agentNamePlaceholder', { defaultValue: 'Enter a name for this agent' })}
+                data-testid='input-assistant-name'
+                className='rounded-8px border-border-2 bg-bg-0'
+              />
+            </div>
+            <div className='flex items-center gap-12px'>
+              <FieldLabel>{t('settings.assistantDescription', { defaultValue: 'Description' })}</FieldLabel>
+              <Input
+                value={editDescription}
+                onChange={(value) => setEditDescription(value)}
+                disabled={!isProfileEditable}
+                data-testid='input-assistant-desc'
+                placeholder={t('settings.assistantDescriptionPlaceholder', {
+                  defaultValue: 'What can this assistant help with?',
+                })}
+                className='rounded-8px border-border-2 bg-bg-0'
+              />
+            </div>
+          </div>
         </div>
-      </div>
+      </SectionCard>
 
-      <div className='flex-shrink-0'>
-        <Typography.Text bold>
-          {t('settings.assistantDescription', { defaultValue: 'Assistant Description' })}
-        </Typography.Text>
-        <Input
-          className='mt-10px rounded-4px bg-bg-1'
-          value={editDescription}
-          onChange={(value) => setEditDescription(value)}
-          disabled={!isProfileEditable}
-          data-testid='input-assistant-desc'
-          placeholder={t('settings.assistantDescriptionPlaceholder', {
-            defaultValue: 'What can this assistant help with?',
-          })}
-        />
-      </div>
-
-      <div className='flex-shrink-0'>
-        <Typography.Text bold>{t('settings.assistantMainAgent', { defaultValue: 'Main Agent' })}</Typography.Text>
-        <Select
-          className='mt-10px w-full rounded-4px'
-          value={editAgent}
-          onChange={(value) => setEditAgent(value as string)}
-          disabled={!isAgentEditable}
-          data-testid='select-assistant-agent'
-        >
-          {availableBackends.map((option) => (
-            <Select.Option key={option.id} value={option.id}>
-              <span className='flex items-center gap-6px'>
-                {option.name}
-                {option.isExtension && (
-                  <Tag size='small' color='arcoblue'>
-                    ext
-                  </Tag>
-                )}
-              </span>
-            </Select.Option>
-          ))}
-        </Select>
-      </div>
-
-      <div className='grid gap-16px md:grid-cols-2'>
-        <div className='flex-shrink-0'>
-          <Typography.Text bold>
-            {t('settings.assistantDefaultModelLabel', { defaultValue: 'Default Model' })}
-          </Typography.Text>
-          <div className='mt-10px flex flex-col gap-10px'>
-            <Select
-              value={defaultModelMode}
-              onChange={(value) => setDefaultModelMode(value as 'auto' | 'fixed')}
-              disabled={!isDefaultsEditable}
-              data-testid='select-assistant-default-model-mode'
+      {!isBuiltin ? (
+        <SectionCard
+          title={t('settings.assistantRecommendedPromptsLabel', { defaultValue: 'Recommended Prompts' })}
+          legend={{
+            label: t('settings.assistantEffectiveImmediately', { defaultValue: 'Applies immediately' }),
+            tone: 'now',
+          }}
+          readOnly={false}
+          readOnlyLabel={readOnlyLabel}
+          extra={
+            <Button
+              type='outline'
+              size='small'
+              className='!rounded-10px'
+              aria-label={t('common.add', { defaultValue: 'Add' })}
+              onClick={() => {
+                setAddingPrompt(true);
+                setEditingPromptIndex(null);
+                setEditingPromptDraft('');
+              }}
             >
-              <Select.Option value='auto'>
-                {t('settings.assistantRememberLastUsed', { defaultValue: 'Remember last used' })}
-              </Select.Option>
-              <Select.Option value='fixed'>
-                {t('settings.assistantUseFixedValue', { defaultValue: 'Use fixed value' })}
-              </Select.Option>
-            </Select>
+              + {t('common.add', { defaultValue: 'Add' })}
+            </Button>
+          }
+          testId='assistant-card-prompts'
+        >
+          <div className='space-y-12px rounded-10px border border-border-2 bg-bg-0 px-12px py-14px'>
+            {addingPrompt ? (
+              <div className='flex items-center gap-8px rounded-8px bg-fill-1 p-10px'>
+                <Input
+                  value={newPromptDraft}
+                  onChange={(value) => setNewPromptDraft(value)}
+                  placeholder={t('settings.assistantRecommendedPromptsPlaceholder', {
+                    defaultValue: 'Enter one suggested prompt per line',
+                  })}
+                  data-testid='input-assistant-recommended-prompt-new'
+                />
+                <Button size='small' type='primary' onClick={handleAddPrompt}>
+                  {t('common.add', { defaultValue: 'Add' })}
+                </Button>
+                <Button
+                  size='small'
+                  type='secondary'
+                  onClick={() => {
+                    setAddingPrompt(false);
+                    setNewPromptDraft('');
+                  }}
+                >
+                  {t('common.cancel', { defaultValue: 'Cancel' })}
+                </Button>
+              </div>
+            ) : null}
+
+            {recommendedPromptItems.length > 0 ? (
+              <div className='space-y-12px'>
+                {recommendedPromptItems.map((prompt, index) => {
+                  const isEditingPrompt = editingPromptIndex === index;
+                  return (
+                    <div key={`${prompt}-${index}`} className='flex items-start gap-12px'>
+                      <div className='w-24px pt-10px text-right text-12px font-500 text-t-quaternary'>{index + 1}.</div>
+                      <div className='min-w-0 flex-1'>
+                        {isEditingPrompt ? (
+                          <div className='space-y-8px'>
+                            <Input
+                              value={editingPromptDraft}
+                              onChange={(value) => setEditingPromptDraft(value)}
+                              data-testid={`input-assistant-recommended-prompt-${index}`}
+                            />
+                            <div className='flex items-center gap-8px'>
+                              <Button size='small' type='primary' onClick={handleSavePromptEdit}>
+                                {t('common.save', { defaultValue: 'Save' })}
+                              </Button>
+                              <Button
+                                size='small'
+                                type='secondary'
+                                onClick={() => {
+                                  setEditingPromptIndex(null);
+                                  setEditingPromptDraft('');
+                                }}
+                              >
+                                {t('common.cancel', { defaultValue: 'Cancel' })}
+                              </Button>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className='flex items-start gap-12px'>
+                            <div className='min-h-36px flex-1 px-4px py-8px text-13px font-500 leading-22px text-t-primary'>
+                              {prompt}
+                            </div>
+                            <div className='flex flex-shrink-0 items-center gap-8px'>
+                              <Button size='small' type='secondary' onClick={() => handleBeginPromptEdit(index)}>
+                                {t('common.edit', { defaultValue: 'Edit' })}
+                              </Button>
+                              <Button size='small' type='secondary' onClick={() => handleDeletePrompt(index)}>
+                                {t('common.delete', { defaultValue: 'Delete' })}
+                              </Button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : !addingPrompt ? (
+              <div className='rounded-8px bg-fill-1 px-12px py-14px text-13px text-t-tertiary'>
+                {t('settings.assistantRecommendedPromptsPlaceholder', {
+                  defaultValue: 'Enter one suggested prompt per line',
+                })}
+              </div>
+            ) : null}
+          </div>
+        </SectionCard>
+      ) : (
+        <SectionCard
+          title={t('settings.assistantOfficialManagedContent', { defaultValue: 'Official Managed Content' })}
+          readOnly={true}
+          readOnlyLabel={readOnlyLabel}
+          testId='assistant-card-official-content'
+        >
+          <div className='space-y-10px'>
+            <div className='flex items-center gap-12px'>
+              <FieldLabel>{t('settings.assistantSkills', { defaultValue: 'Skills' })}</FieldLabel>
+              <div className='flex-1 rounded-8px bg-fill-1 px-12px py-8px text-13px text-t-secondary'>
+                {t('settings.assistantManagedSkillsSummary', {
+                  defaultValue: 'Builtin rules and skill defaults stay aligned with official updates.',
+                })}
+              </div>
+            </div>
+            <div className='flex items-center gap-12px'>
+              <FieldLabel>
+                {t('settings.assistantRecommendedPromptsLabel', { defaultValue: 'Recommended Prompts' })}
+              </FieldLabel>
+              <div className='flex-1 rounded-8px bg-fill-1 px-12px py-8px text-13px text-t-secondary'>
+                {recommendedPromptItems.length > 0
+                  ? t('settings.assistantManagedPromptCount', {
+                      defaultValue: '{{count}} prompt suggestions maintained by the product.',
+                      count: recommendedPromptItems.length,
+                    })
+                  : t('settings.assistantManagedPromptFallback', {
+                      defaultValue: 'Prompt suggestions are maintained by the product.',
+                    })}
+              </div>
+            </div>
+          </div>
+        </SectionCard>
+      )}
+
+      <SectionCard
+        title={t('settings.assistantEngineSection', { defaultValue: 'Engine' })}
+        readOnly={false}
+        readOnlyLabel={readOnlyLabel}
+        testId='assistant-card-engine'
+      >
+        <div className='flex items-center gap-12px'>
+          <FieldLabel>{t('settings.assistantMainAgent', { defaultValue: 'Main Agent' })}</FieldLabel>
+          <div className='min-w-0 flex-1'>
             <Select
-              value={defaultModelMode === 'fixed' ? defaultModelValue || undefined : undefined}
-              onChange={(value) => setDefaultModelValue(value as string)}
-              disabled={!isDefaultsEditable || defaultModelMode !== 'fixed'}
-              allowClear
+              className='w-full'
+              value={editAgent}
+              onChange={(value) => setEditAgent(value as string)}
+              disabled={!isAgentEditable}
+              data-testid='select-assistant-agent'
+            >
+              {availableBackends.map((option) => (
+                <Select.Option key={option.id} value={option.id}>
+                  <span className='flex items-center gap-6px'>
+                    {option.name}
+                    {option.isExtension ? (
+                      <Tag size='small' color='arcoblue'>
+                        ext
+                      </Tag>
+                    ) : null}
+                  </span>
+                </Select.Option>
+              ))}
+            </Select>
+            <div className='mt-6px text-11px text-t-tertiary'>
+              {t('settings.assistantEngineAffectsDefaults', {
+                defaultValue: 'Changing the main agent updates which model and permission values are available below.',
+              })}
+            </div>
+          </div>
+        </div>
+      </SectionCard>
+
+      <SectionCard
+        title={t('settings.assistantDefaultConfigSection', { defaultValue: 'Default Configuration' })}
+        legend={{
+          label: t('settings.assistantOnlyNewConversation', { defaultValue: 'New conversations only' }),
+          tone: 'next',
+        }}
+        readOnly={isBuiltin || isExtension}
+        readOnlyLabel={readOnlyLabel}
+        testId='assistant-card-defaults'
+      >
+        <div className='space-y-16px'>
+          <ConfigRow
+            label={t('settings.assistantDefaultModelLabel', { defaultValue: 'Default Model' })}
+            hint={t('settings.assistantRememberLastUsedHint', {
+              defaultValue:
+                'When left unset, the assistant will reuse the last model and permission you selected for it.',
+            })}
+          >
+            <Select
+              value={defaultModelMode === 'fixed' && defaultModelValue ? defaultModelValue : '__AUTO__'}
+              onChange={(value) => {
+                const nextValue = value as string;
+                if (nextValue === '__AUTO__') {
+                  setDefaultModelMode('auto');
+                  setDefaultModelValue('');
+                  return;
+                }
+                setDefaultModelMode('fixed');
+                setDefaultModelValue(nextValue);
+              }}
+              disabled={!isDefaultsEditable}
+              allowClear={false}
               placeholder={t('settings.assistantSelectDefaultModel', { defaultValue: 'Select a model' })}
               notFoundContent={t('settings.assistantNoAvailableModels', {
                 defaultValue: 'No available models configured',
               })}
               data-testid='select-assistant-default-model'
             >
+              <Select.Option value='__AUTO__'>{autoDefaultOptionLabel}</Select.Option>
               {modelOptions.map((option) => (
                 <Select.Option key={option.key} value={option.value}>
                   {option.label}
                 </Select.Option>
               ))}
             </Select>
-          </div>
-        </div>
+          </ConfigRow>
 
-        <div className='flex-shrink-0'>
-          <Typography.Text bold>
-            {t('settings.assistantDefaultPermissionLabel', { defaultValue: 'Default Permission' })}
-          </Typography.Text>
-          <div className='mt-10px flex flex-col gap-10px'>
+          <ConfigRow label={t('settings.assistantDefaultPermissionLabel', { defaultValue: 'Default Permission' })}>
             <Select
-              value={defaultPermissionMode}
-              onChange={(value) => setDefaultPermissionMode(value as 'auto' | 'fixed')}
+              value={defaultPermissionMode === 'fixed' && defaultPermissionValue ? defaultPermissionValue : '__AUTO__'}
+              onChange={(value) => {
+                const nextValue = value as string;
+                if (nextValue === '__AUTO__') {
+                  setDefaultPermissionMode('auto');
+                  setDefaultPermissionValue('');
+                  return;
+                }
+                setDefaultPermissionMode('fixed');
+                setDefaultPermissionValue(nextValue);
+              }}
               disabled={!isDefaultsEditable}
-              data-testid='select-assistant-default-permission-mode'
-            >
-              <Select.Option value='auto'>
-                {t('settings.assistantRememberLastUsed', { defaultValue: 'Remember last used' })}
-              </Select.Option>
-              <Select.Option value='fixed'>
-                {t('settings.assistantUseFixedValue', { defaultValue: 'Use fixed value' })}
-              </Select.Option>
-            </Select>
-            <Select
-              value={defaultPermissionMode === 'fixed' ? defaultPermissionValue || undefined : undefined}
-              onChange={(value) => setDefaultPermissionValue(value as string)}
-              disabled={!isDefaultsEditable || defaultPermissionMode !== 'fixed'}
-              allowClear
+              allowClear={false}
               placeholder={t('settings.assistantSelectDefaultPermission', {
                 defaultValue: 'Select a permission mode',
               })}
@@ -357,490 +677,191 @@ const AssistantEditorSections: React.FC<AssistantEditorSectionsProps> = ({
               })}
               data-testid='select-assistant-default-permission'
             >
+              <Select.Option value='__AUTO__'>{autoDefaultOptionLabel}</Select.Option>
               {permissionOptions.map((option) => (
                 <Select.Option key={option.value} value={option.value}>
                   {option.label}
                 </Select.Option>
               ))}
             </Select>
-          </div>
-        </div>
-      </div>
+          </ConfigRow>
 
-      <div className='flex-shrink-0'>
-        <Typography.Text bold>
-          {t('settings.assistantRecommendedPromptsLabel', { defaultValue: 'Recommended Prompts' })}
-        </Typography.Text>
-        <Input.TextArea
-          className='mt-10px rounded-4px bg-bg-1'
-          value={editRecommendedPromptsText}
-          onChange={(value) => setEditRecommendedPromptsText(value)}
-          disabled={!isDefaultsEditable}
-          autoSize={{ minRows: 3, maxRows: 6 }}
-          data-testid='textarea-assistant-recommended-prompts'
-          placeholder={t('settings.assistantRecommendedPromptsPlaceholder', {
-            defaultValue: 'Enter one suggested prompt per line',
-          })}
-        />
-      </div>
+          {showSkills ? (
+            <ConfigRow label={t('settings.assistantDefaultSkillsLabel', { defaultValue: 'Default Skills' })}>
+              <Select
+                value={defaultSkillsMode}
+                onChange={(value) => setDefaultSkillsMode(value as 'auto' | 'fixed')}
+                disabled={!isDefaultsEditable}
+                data-testid='select-assistant-default-skills-mode'
+              >
+                <Select.Option value='auto'>{autoDefaultOptionLabel}</Select.Option>
+                <Select.Option value='fixed'>
+                  {t('settings.assistantUseFixedValue', { defaultValue: 'Use fixed value' })}
+                </Select.Option>
+              </Select>
+              {defaultSkillsMode === 'fixed' ? (
+                <Select
+                  mode='multiple'
+                  value={selectedSkillValues}
+                  onChange={(value) => handleSkillSelectionChange((value as string[]) ?? [])}
+                  disabled={!isDefaultsEditable}
+                  allowClear
+                  maxTagCount={{
+                    count: 0,
+                    render: () => selectedItemsLabel(selectedSkillValues.length),
+                  }}
+                  placeholder={t('settings.assistantDefaultSkillsLabel', { defaultValue: 'Default Skills' })}
+                  data-testid='select-assistant-default-skills'
+                >
+                  {editableSkillOptions.map((option) => (
+                    <Select.Option key={option.value} value={option.value} disabled={option.disabled}>
+                      <div className='flex items-center justify-between gap-8px'>
+                        <span>{option.label}</span>
+                        {option.sourceLabel ? (
+                          <span className='text-11px text-t-tertiary'>{option.sourceLabel}</span>
+                        ) : null}
+                      </div>
+                    </Select.Option>
+                  ))}
+                </Select>
+              ) : null}
+            </ConfigRow>
+          ) : null}
 
-      <div className='flex flex-wrap items-center gap-8px p-10px rd-10px bg-fill-1'>
-        <span className='text-12px text-t-secondary'>
-          {t('settings.assistantMainAgent', { defaultValue: 'Main Agent' })}:
-        </span>
-        <Tag size='small' color='arcoblue'>
-          {editAgent}
-        </Tag>
-        <span className='text-12px text-t-secondary ml-6px'>
-          {t('settings.assistantSkills', { defaultValue: 'Skills' })}:
-        </span>
-        <Tag size='small' color={totalActiveSkillsCount > 0 ? 'green' : 'gray'}>
-          {totalActiveSkillsCount > 0 ? `${totalActiveSkillsCount}/${totalSkillsCount}` : totalSkillsCount}
-        </Tag>
-      </div>
-
-      <div className='flex-shrink-0'>
-        <div className='flex items-center justify-between'>
-          <Typography.Text bold className='flex-shrink-0'>
-            {t('settings.assistantRules', { defaultValue: 'Rules' })}
-          </Typography.Text>
-          <Button
-            type='text'
-            size='mini'
-            data-testid='btn-expand-rules'
-            onClick={() => setRulesExpanded((previous) => !previous)}
-          >
-            {rulesExpanded
-              ? t('common.collapse', { defaultValue: 'Collapse' })
-              : t('common.expand', { defaultValue: 'Expand' })}
-          </Button>
-        </div>
-        <div
-          className='mt-10px border border-border-2 overflow-hidden rounded-4px'
-          style={{ height: rulesContainerHeight }}
-        >
-          {isRuleEditable && (
-            <div className='flex items-center h-36px bg-fill-2 border-b border-border-2 flex-shrink-0'>
+          <ConfigRow
+            label={t('settings.assistantDefaultMcpLabel', { defaultValue: 'Default MCP' })}
+            hint={
               <Button
                 type='text'
                 size='mini'
-                className={`!h-full !rounded-none !px-16px text-13px font-medium ${promptViewMode === 'edit' ? '!text-primary border-b-2 border-primary bg-bg-1' : '!text-t-secondary hover:!text-t-primary'}`}
-                onClick={() => setPromptViewMode('edit')}
+                onClick={() => navigate('/settings/capabilities?tab=tools')}
+                data-testid='btn-open-mcp-settings'
+                className='!h-auto !px-0 !text-primary-6'
               >
-                {t('settings.promptEdit', { defaultValue: 'Edit' })}
+                {t('settings.assistantOpenMcpSettings', { defaultValue: 'Open MCP settings' })}
               </Button>
-              <Button
-                type='text'
-                size='mini'
-                className={`!h-full !rounded-none !px-16px text-13px font-medium ${promptViewMode === 'preview' ? '!text-primary border-b-2 border-primary bg-bg-1' : '!text-t-secondary hover:!text-t-primary'}`}
-                onClick={() => setPromptViewMode('preview')}
-              >
-                {t('settings.promptPreview', { defaultValue: 'Preview' })}
-              </Button>
-            </div>
-          )}
-          <div
-            className='bg-fill-2'
-            style={{
-              height: isRuleEditable ? 'calc(100% - 36px)' : '100%',
-              overflow: 'auto',
-            }}
+            }
           >
-            {promptViewMode === 'edit' && isRuleEditable ? (
-              <div ref={textareaWrapperRef} className='h-full'>
-                <Input.TextArea
-                  value={editContext}
-                  onChange={(value) => setEditContext(value)}
-                  placeholder={t('settings.assistantRulesPlaceholder', {
-                    defaultValue: 'Enter rules in Markdown format...',
-                  })}
-                  autoSize={false}
-                  className='border-none rounded-none bg-transparent h-full resize-none'
-                />
-              </div>
-            ) : (
-              <div className='p-16px text-14px leading-7'>
-                {editContext ? (
-                  <MarkdownView hiddenCodeCopyButton>{editContext}</MarkdownView>
-                ) : (
-                  <div className='text-t-secondary text-center py-32px'>
-                    {t('settings.promptPreviewEmpty', { defaultValue: 'No content to preview' })}
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-
-      {showSkills && (
-        <div className='flex-shrink-0 mt-16px' data-testid='skills-section'>
-          <div className='flex items-center justify-between mb-12px'>
-            <Typography.Text bold>{t('settings.assistantSkills', { defaultValue: 'Skills' })}</Typography.Text>
-            {isSkillsEditable && (
-              <Button
-                size='small'
-                type='outline'
-                icon={<Plus size={14} />}
-                onClick={() => navigate('/settings/capabilities?tab=skills')}
-                className='rounded-[100px]'
-                data-testid='btn-add-skills'
-              >
-                {t('settings.addSkills', { defaultValue: 'Add Skills' })}
-              </Button>
-            )}
-          </div>
-
-          <div className='mb-12px'>
             <Select
-              value={defaultSkillsMode}
-              onChange={(value) => setDefaultSkillsMode(value as 'auto' | 'fixed')}
+              value={defaultMcpMode}
+              onChange={(value) => setDefaultMcpMode(value as 'auto' | 'fixed')}
               disabled={!isDefaultsEditable}
-              data-testid='select-assistant-default-skills-mode'
+              data-testid='select-assistant-default-mcp-mode'
             >
+              <Select.Option value='auto'>{autoDefaultOptionLabel}</Select.Option>
               <Select.Option value='fixed'>
                 {t('settings.assistantUseFixedValue', { defaultValue: 'Use fixed value' })}
               </Select.Option>
-              <Select.Option value='auto'>
-                {t('settings.assistantRememberLastUsed', { defaultValue: 'Remember last used' })}
-              </Select.Option>
             </Select>
-          </div>
+            {defaultMcpMode === 'fixed' ? (
+              <Select
+                mode='multiple'
+                value={selectedMcpIds}
+                onChange={(value) => setSelectedMcpIds((value as string[]) ?? [])}
+                disabled={!isDefaultsEditable}
+                allowClear
+                maxTagCount={{
+                  count: 0,
+                  render: () => selectedItemsLabel(selectedMcpIds.length),
+                }}
+                placeholder={t('settings.assistantSelectDefaultMcp', { defaultValue: 'Select MCP servers' })}
+                notFoundContent={t('settings.assistantNoAvailableMcps', {
+                  defaultValue: 'No enabled MCP servers are available.',
+                })}
+                data-testid='select-assistant-default-mcp'
+              >
+                {enabledMcpServers.map((server) => (
+                  <Select.Option key={server.id} value={server.id}>
+                    {server.name}
+                  </Select.Option>
+                ))}
+              </Select>
+            ) : null}
+          </ConfigRow>
+        </div>
+      </SectionCard>
 
-          <Collapse defaultActiveKey={['custom-skills']} data-testid='skills-collapse'>
-            <Collapse.Item
-              header={
-                <span className='text-13px font-medium'>
-                  {t('settings.customSkills', { defaultValue: 'Imported Skills (Library)' })}
-                </span>
-              }
-              name='custom-skills'
-              className='mb-8px'
-              extra={
-                <div className='flex items-center gap-8px'>
-                  <span
-                    className='inline-block w-8px h-8px rd-50%'
-                    style={{ background: customStatusDotColor }}
-                    aria-hidden='true'
-                  />
-                  <span className='text-12px text-t-secondary'>
-                    {customActiveCount > 0
-                      ? `${customActiveCount}/${pendingSkills.length + customSkillItems.length}`
-                      : pendingSkills.length + customSkillItems.length}
-                  </span>
-                </div>
-              }
-            >
-              <div className='space-y-4px'>
-                {pendingSkills.map((skill) => (
-                  <div
-                    key={`pending-${skill.name}`}
-                    className='flex items-start gap-8px p-8px hover:bg-fill-1 rounded-4px group'
-                  >
-                    <Checkbox
-                      checked={selectedSkills.includes(skill.name)}
-                      disabled={!isSkillsEditable}
-                      className='mt-2px cursor-pointer'
-                      onChange={() => {
-                        if (selectedSkills.includes(skill.name)) {
-                          setSelectedSkills(selectedSkills.filter((name) => name !== skill.name));
-                        } else {
-                          setSelectedSkills([...selectedSkills, skill.name]);
-                        }
-                      }}
-                    />
-                    <div className='flex-1 min-w-0'>
-                      <div className='flex items-center gap-6px'>
-                        <div className='text-13px font-medium text-t-primary'>{skill.name}</div>
-                        <span className='bg-[rgba(var(--primary-6),0.08)] text-primary-6 border border-[rgba(var(--primary-6),0.2)] text-10px px-4px py-1px rd-4px font-medium uppercase'>
-                          Pending
-                        </span>
-                      </div>
-                      {skill.description && (
-                        <div className='text-12px text-t-secondary mt-2px line-clamp-2'>{skill.description}</div>
-                      )}
-                    </div>
-                    <Button
-                      type='text'
-                      size='mini'
-                      className='opacity-0 group-hover:opacity-100 transition-opacity !p-4px hover:bg-fill-2 rounded-4px'
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        setDeletePendingSkillName(skill.name);
-                      }}
-                    >
-                      <Delete size={16} fill='var(--color-text-3)' />
-                    </Button>
-                  </div>
-                ))}
-                {customSkillItems.map((skill) => (
-                  <div
-                    key={`custom-${skill.name}`}
-                    className='flex items-start gap-8px p-8px hover:bg-fill-1 rounded-4px group'
-                  >
-                    <Checkbox
-                      checked={selectedSkills.includes(skill.name)}
-                      disabled={!isSkillsEditable}
-                      className='mt-2px cursor-pointer'
-                      onChange={() => {
-                        if (selectedSkills.includes(skill.name)) {
-                          setSelectedSkills(selectedSkills.filter((name) => name !== skill.name));
-                        } else {
-                          setSelectedSkills([...selectedSkills, skill.name]);
-                        }
-                      }}
-                    />
-                    <div className='flex-1 min-w-0'>
-                      <div className='flex items-center gap-6px'>
-                        <div className='text-13px font-medium text-t-primary'>{skill.name}</div>
-                        <span className='bg-[rgba(242,156,27,0.08)] text-[rgb(242,156,27)] border border-[rgba(242,156,27,0.2)] text-10px px-4px py-1px rd-4px font-medium uppercase'>
-                          {t('settings.skillsHub.custom', { defaultValue: 'Custom' })}
-                        </span>
-                      </div>
-                      {skill.description && (
-                        <div className='text-12px text-t-secondary mt-2px line-clamp-2'>{skill.description}</div>
-                      )}
-                    </div>
-                    <Button
-                      type='text'
-                      size='mini'
-                      className='opacity-0 group-hover:opacity-100 transition-opacity !p-4px hover:bg-fill-2 rounded-4px'
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        setDeleteCustomSkillName(skill.name);
-                      }}
-                    >
-                      <Delete size={16} fill='var(--color-text-3)' />
-                    </Button>
-                  </div>
-                ))}
-                {pendingSkills.length === 0 && customSkillItems.length === 0 && (
-                  <div className='text-center text-t-secondary text-12px py-16px'>
-                    {t('settings.noCustomSkills', { defaultValue: 'No custom skills added' })}
-                  </div>
-                )}
+      <SectionCard
+        title={t('settings.assistantRules', { defaultValue: 'Rules' })}
+        legend={{
+          label: t('settings.assistantOnlyNewConversation', { defaultValue: 'New conversations only' }),
+          tone: 'next',
+        }}
+        readOnly={isBuiltin || isExtension}
+        readOnlyLabel={readOnlyLabel}
+        extra={
+          <div className='flex items-center gap-6px'>
+            {isRuleEditable ? (
+              <div className='flex items-center rounded-8px bg-fill-1 p-2px'>
+                <Button
+                  type='text'
+                  size='mini'
+                  className={`${promptViewMode === 'edit' ? '!rounded-6px !bg-bg-0 !text-primary-6' : '!rounded-6px !text-t-secondary'}`}
+                  onClick={() => setPromptViewMode('edit')}
+                >
+                  {t('settings.promptEdit', { defaultValue: 'Edit' })}
+                </Button>
+                <Button
+                  type='text'
+                  size='mini'
+                  className={`${promptViewMode === 'preview' ? '!rounded-6px !bg-bg-0 !text-primary-6' : '!rounded-6px !text-t-secondary'}`}
+                  onClick={() => setPromptViewMode('preview')}
+                >
+                  {t('settings.promptPreview', { defaultValue: 'Preview' })}
+                </Button>
               </div>
-            </Collapse.Item>
-
-            <Collapse.Item
-              header={
-                <span className='text-13px font-medium'>
-                  {t('settings.builtinSkills', { defaultValue: 'Builtin Skills' })}
-                </span>
-              }
-              name='builtin-skills'
-              extra={
-                <div className='flex items-center gap-8px'>
-                  <span
-                    className='inline-block w-8px h-8px rd-50%'
-                    style={{ background: builtinStatusDotColor }}
-                    aria-hidden='true'
-                  />
-                  <span className='text-12px text-t-secondary'>
-                    {builtinActiveCount > 0
-                      ? `${builtinActiveCount}/${builtinSkillItems.length}`
-                      : builtinSkillItems.length}
-                  </span>
-                </div>
-              }
+            ) : null}
+            <Button
+              type='text'
+              size='mini'
+              data-testid='btn-expand-rules'
+              onClick={() => setRulesExpanded((previous) => !previous)}
             >
-              {builtinSkillItems.length > 0 ? (
-                <div className='space-y-4px'>
-                  {builtinSkillItems.map((skill) => (
-                    <div key={skill.name} className='flex items-start gap-8px p-8px hover:bg-fill-1 rounded-4px'>
-                      <Checkbox
-                        checked={selectedSkills.includes(skill.name)}
-                        disabled={!isSkillsEditable}
-                        className='mt-2px cursor-pointer'
-                        onChange={() => {
-                          if (selectedSkills.includes(skill.name)) {
-                            setSelectedSkills(selectedSkills.filter((name) => name !== skill.name));
-                          } else {
-                            setSelectedSkills([...selectedSkills, skill.name]);
-                          }
-                        }}
-                      />
-                      <div className='flex-1 min-w-0'>
-                        <div className='text-13px font-medium text-t-primary'>{skill.name}</div>
-                        {skill.description && (
-                          <div className='text-12px text-t-secondary mt-2px line-clamp-2'>{skill.description}</div>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
+              {rulesExpanded
+                ? t('common.collapse', { defaultValue: 'Collapse' })
+                : t('common.expand', { defaultValue: 'Expand' })}
+            </Button>
+          </div>
+        }
+        testId='assistant-card-rules'
+      >
+        <div
+          className='overflow-hidden rounded-10px border border-border-2 bg-fill-1'
+          style={{ height: rulesContainerHeight }}
+        >
+          {promptViewMode === 'edit' && isRuleEditable ? (
+            <div ref={textareaWrapperRef} className='h-full'>
+              <Input.TextArea
+                value={editContext}
+                onChange={(value) => setEditContext(value)}
+                placeholder={t('settings.assistantRulesPlaceholder', {
+                  defaultValue: 'Enter rules in Markdown format...',
+                })}
+                autoSize={false}
+                className='!h-full !rounded-none !border-none !bg-transparent'
+              />
+            </div>
+          ) : (
+            <div className='h-full overflow-auto px-14px py-12px text-13px leading-22px text-t-secondary'>
+              {editContext ? (
+                <MarkdownView hiddenCodeCopyButton>{editContext}</MarkdownView>
               ) : (
-                <div className='text-center text-t-secondary text-12px py-16px'>
-                  {t('settings.noBuiltinSkills', { defaultValue: 'No builtin skills available' })}
+                <div className='py-24px text-center text-t-tertiary'>
+                  {t('settings.promptPreviewEmpty', { defaultValue: 'No content to preview' })}
                 </div>
               )}
-            </Collapse.Item>
-
-            {extensionSkillItems.length > 0 && (
-              <Collapse.Item
-                header={
-                  <span className='text-13px font-medium'>
-                    {t('settings.extensionSkills', { defaultValue: 'Extension Skills' })}
-                  </span>
-                }
-                name='extension-skills'
-                extra={
-                  <div className='flex items-center gap-8px'>
-                    <span
-                      className='inline-block w-8px h-8px rd-50%'
-                      style={{ background: extensionStatusDotColor }}
-                      aria-hidden='true'
-                    />
-                    <span className='text-12px text-t-secondary'>
-                      {extensionActiveCount > 0
-                        ? `${extensionActiveCount}/${extensionSkillItems.length}`
-                        : extensionSkillItems.length}
-                    </span>
-                  </div>
-                }
-              >
-                <div className='space-y-4px'>
-                  {extensionSkillItems.map((skill) => (
-                    <div key={skill.name} className='flex items-start gap-8px p-8px hover:bg-fill-1 rounded-4px'>
-                      <Checkbox
-                        checked={selectedSkills.includes(skill.name)}
-                        disabled={!isSkillsEditable}
-                        className='mt-2px cursor-pointer'
-                        onChange={() => {
-                          if (selectedSkills.includes(skill.name)) {
-                            setSelectedSkills(selectedSkills.filter((name) => name !== skill.name));
-                          } else {
-                            setSelectedSkills([...selectedSkills, skill.name]);
-                          }
-                        }}
-                      />
-                      <div className='flex-1 min-w-0'>
-                        <div className='flex items-center gap-6px'>
-                          <div className='text-13px font-medium text-t-primary'>{skill.name}</div>
-                          <span className='bg-[rgba(var(--primary-6),0.08)] text-primary-6 border border-[rgba(var(--primary-6),0.2)] text-10px px-4px py-1px rd-4px font-medium uppercase'>
-                            {t('settings.extensionSkillsBadge', { defaultValue: 'Extension' })}
-                          </span>
-                        </div>
-                        {skill.description && (
-                          <div className='text-12px text-t-secondary mt-2px line-clamp-2'>{skill.description}</div>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </Collapse.Item>
-            )}
-
-            {builtinAutoSkills.length > 0 && (
-              <Collapse.Item
-                header={
-                  <span className='text-13px font-medium'>
-                    {t('settings.autoInjectedSkills', { defaultValue: 'Auto-injected Skills' })}
-                  </span>
-                }
-                name='auto-injected-skills'
-                extra={
-                  <div className='flex items-center gap-8px'>
-                    <span
-                      className='inline-block w-8px h-8px rd-50%'
-                      style={{ background: autoInjectedStatusDotColor }}
-                      aria-hidden='true'
-                    />
-                    <span className='text-12px text-t-secondary'>{`${autoInjectedActiveCount}/${builtinAutoSkills.length}`}</span>
-                  </div>
-                }
-              >
-                <div className='space-y-4px'>
-                  {builtinAutoSkills.map((skill) => (
-                    <div key={skill.name} className='flex items-start gap-8px p-8px hover:bg-fill-1 rounded-4px'>
-                      <Checkbox
-                        checked={!disabledBuiltinSkills.includes(skill.name)}
-                        disabled={!isSkillsEditable}
-                        className='mt-2px cursor-pointer'
-                        onChange={() => {
-                          if (disabledBuiltinSkills.includes(skill.name)) {
-                            setDisabledBuiltinSkills(disabledBuiltinSkills.filter((name) => name !== skill.name));
-                          } else {
-                            setDisabledBuiltinSkills([...disabledBuiltinSkills, skill.name]);
-                          }
-                        }}
-                      />
-                      <div className='flex-1 min-w-0'>
-                        <div className='flex items-center gap-6px'>
-                          <div className='text-13px font-medium text-t-primary'>{skill.name}</div>
-                          <span className='bg-[rgba(var(--success-6),0.08)] text-[rgb(var(--success-6))] border border-[rgba(var(--success-6),0.2)] text-10px px-4px py-1px rd-4px font-medium uppercase'>
-                            {t('settings.autoInjectedSkillsBadge', { defaultValue: 'Auto' })}
-                          </span>
-                        </div>
-                        {skill.description && (
-                          <div className='text-12px text-t-secondary mt-2px line-clamp-2'>{skill.description}</div>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </Collapse.Item>
-            )}
-          </Collapse>
+            </div>
+          )}
         </div>
-      )}
+      </SectionCard>
 
-      <div className='flex-shrink-0'>
-        <div className='flex items-center justify-between'>
-          <Typography.Text bold>
-            {t('settings.assistantDefaultMcpLabel', { defaultValue: 'Default MCP' })}
-          </Typography.Text>
-          <Button
-            type='text'
-            size='mini'
-            onClick={() => navigate('/settings/capabilities?tab=tools')}
-            data-testid='btn-open-mcp-settings'
-          >
-            {t('settings.assistantOpenMcpSettings', { defaultValue: 'Open MCP settings' })}
-          </Button>
-        </div>
-        <div className='mt-10px flex flex-col gap-10px'>
-          <Select
-            value={defaultMcpMode}
-            onChange={(value) => setDefaultMcpMode(value as 'auto' | 'fixed')}
-            disabled={!isDefaultsEditable}
-            data-testid='select-assistant-default-mcp-mode'
-          >
-            <Select.Option value='auto'>
-              {t('settings.assistantRememberLastUsed', { defaultValue: 'Remember last used' })}
-            </Select.Option>
-            <Select.Option value='fixed'>
-              {t('settings.assistantUseFixedValue', { defaultValue: 'Use fixed value' })}
-            </Select.Option>
-          </Select>
-          <Select
-            mode='multiple'
-            value={selectedMcpIds}
-            onChange={(value) => setSelectedMcpIds((value as string[]) ?? [])}
-            disabled={!isDefaultsEditable || defaultMcpMode !== 'fixed'}
-            allowClear
-            placeholder={t('settings.assistantSelectDefaultMcp', { defaultValue: 'Select MCP servers' })}
-            notFoundContent={t('settings.assistantNoAvailableMcps', {
-              defaultValue: 'No enabled MCP servers are available.',
-            })}
-            data-testid='select-assistant-default-mcp'
-          >
-            {enabledMcpServers.map((server) => (
-              <Select.Option key={server.id} value={server.id}>
-                {server.name}
-              </Select.Option>
-            ))}
-          </Select>
-        </div>
-      </div>
-
-      {activeAssistant && isExtensionAssistant(activeAssistant) && (
-        <div className='text-12px text-t-tertiary'>
+      {activeAssistant && isExtensionAssistant(activeAssistant) ? (
+        <div className='px-4px text-12px text-t-tertiary'>
           {t('settings.assistantExtensionReadonlyTip', {
             defaultValue: 'Extension assistants are read-only in assistant settings.',
           })}
         </div>
-      )}
+      ) : null}
     </div>
   );
 };
