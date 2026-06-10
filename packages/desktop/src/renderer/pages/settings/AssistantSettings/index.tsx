@@ -145,6 +145,13 @@ const AssistantSettings: React.FC = () => {
               setDefaultPermissionMode={editor.setDefaultPermissionMode}
               defaultPermissionValue={editor.defaultPermissionValue}
               setDefaultPermissionValue={editor.setDefaultPermissionValue}
+              defaultSkillsMode={editor.defaultSkillsMode}
+              setDefaultSkillsMode={editor.setDefaultSkillsMode}
+              defaultMcpMode={editor.defaultMcpMode}
+              setDefaultMcpMode={editor.setDefaultMcpMode}
+              availableMcpServers={editor.availableMcpServers}
+              selectedMcpIds={editor.selectedMcpIds}
+              setSelectedMcpIds={editor.setSelectedMcpIds}
               editContext={editor.editContext}
               setEditContext={editor.setEditContext}
               promptViewMode={editor.promptViewMode}

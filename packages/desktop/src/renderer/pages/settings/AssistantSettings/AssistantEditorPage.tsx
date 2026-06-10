@@ -1,4 +1,5 @@
 import type { AssistantListItem, BuiltinAutoSkill, SkillInfo } from './types';
+import type { IMcpServer } from '@/common/config/storage';
 import type { AvailableBackend } from '@/renderer/hooks/assistant';
 import { Button } from '@arco-design/web-react';
 import { ArrowLeft } from '@icon-park/react';
@@ -28,6 +29,13 @@ type AssistantEditorPageProps = {
   setDefaultPermissionMode: (value: 'auto' | 'fixed') => void;
   defaultPermissionValue: string;
   setDefaultPermissionValue: (value: string) => void;
+  defaultSkillsMode: 'auto' | 'fixed';
+  setDefaultSkillsMode: (value: 'auto' | 'fixed') => void;
+  defaultMcpMode: 'auto' | 'fixed';
+  setDefaultMcpMode: (value: 'auto' | 'fixed') => void;
+  availableMcpServers: IMcpServer[];
+  selectedMcpIds: string[];
+  setSelectedMcpIds: (value: string[]) => void;
   editContext: string;
   setEditContext: (value: string) => void;
   promptViewMode: 'edit' | 'preview';
@@ -71,6 +79,13 @@ const AssistantEditorPage: React.FC<AssistantEditorPageProps> = ({
   setDefaultPermissionMode,
   defaultPermissionValue,
   setDefaultPermissionValue,
+  defaultSkillsMode,
+  setDefaultSkillsMode,
+  defaultMcpMode,
+  setDefaultMcpMode,
+  availableMcpServers,
+  selectedMcpIds,
+  setSelectedMcpIds,
   editContext,
   setEditContext,
   promptViewMode,
@@ -157,6 +172,13 @@ const AssistantEditorPage: React.FC<AssistantEditorPageProps> = ({
             setDefaultPermissionMode={setDefaultPermissionMode}
             defaultPermissionValue={defaultPermissionValue}
             setDefaultPermissionValue={setDefaultPermissionValue}
+            defaultSkillsMode={defaultSkillsMode}
+            setDefaultSkillsMode={setDefaultSkillsMode}
+            defaultMcpMode={defaultMcpMode}
+            setDefaultMcpMode={setDefaultMcpMode}
+            availableMcpServers={availableMcpServers}
+            selectedMcpIds={selectedMcpIds}
+            setSelectedMcpIds={setSelectedMcpIds}
             editContext={editContext}
             setEditContext={setEditContext}
             promptViewMode={promptViewMode}

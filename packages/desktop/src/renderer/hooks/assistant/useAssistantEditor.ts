@@ -1,4 +1,5 @@
 import { ipcBridge } from '@/common';
+import type { IMcpServer } from '@/common/config/storage';
 import type { Assistant, CreateAssistantRequest, UpdateAssistantRequest } from '@/common/types/agent/assistantTypes';
 import type { Message } from '@arco-design/web-react';
 import type {
@@ -48,6 +49,10 @@ export const useAssistantEditor = ({
   const [defaultModelValue, setDefaultModelValue] = useState('');
   const [defaultPermissionMode, setDefaultPermissionMode] = useState<'auto' | 'fixed'>('auto');
   const [defaultPermissionValue, setDefaultPermissionValue] = useState('');
+  const [defaultSkillsMode, setDefaultSkillsMode] = useState<'auto' | 'fixed'>('fixed');
+  const [defaultMcpMode, setDefaultMcpMode] = useState<'auto' | 'fixed'>('auto');
+  const [availableMcpServers, setAvailableMcpServers] = useState<IMcpServer[]>([]);
+  const [selectedMcpIds, setSelectedMcpIds] = useState<string[]>([]);
   const [isCreating, setIsCreating] = useState(false);
   const [deleteConfirmVisible, setDeleteConfirmVisible] = useState(false);
   const [promptViewMode, setPromptViewMode] = useState<'edit' | 'preview'>('preview');
@@ -69,12 +74,13 @@ export const useAssistantEditor = ({
 
   const loadEditorResources = useCallback(
     async (assistantId: string) => {
-      const [detail, skillsList, autoSkills] = await Promise.all([
+      const [detail, skillsList, autoSkills, mcpServers] = await Promise.all([
         loadAssistantDetail(assistantId),
         ipcBridge.fs.listAvailableSkills.invoke(),
         ipcBridge.fs.listBuiltinAutoSkills.invoke(),
+        ipcBridge.mcpService.listServers.invoke(),
       ]);
-      return { detail, skillsList, autoSkills };
+      return { detail, skillsList, autoSkills, mcpServers };
     },
     [loadAssistantDetail]
   );
@@ -94,6 +100,9 @@ export const useAssistantEditor = ({
     setDefaultModelValue('');
     setDefaultPermissionMode('auto');
     setDefaultPermissionValue('');
+    setDefaultSkillsMode('fixed');
+    setDefaultMcpMode('auto');
+    setSelectedMcpIds([]);
   }, []);
 
   const handleEdit = async (assistant: AssistantListItem) => {
@@ -109,7 +118,7 @@ export const useAssistantEditor = ({
     resetSkillEditorState();
 
     try {
-      const { detail, skillsList, autoSkills } = await loadEditorResources(assistant.id);
+      const { detail, skillsList, autoSkills, mcpServers } = await loadEditorResources(assistant.id);
       setEditName(detail.profile.name || assistant.name || '');
       setEditDescription(detail.profile.description || '');
       setEditAvatar(detail.profile.avatar || '');
@@ -120,8 +129,12 @@ export const useAssistantEditor = ({
       setDefaultModelValue(detail.defaults.model.value || '');
       setDefaultPermissionMode(detail.defaults.permission.mode === 'fixed' ? 'fixed' : 'auto');
       setDefaultPermissionValue(detail.defaults.permission.value || '');
+      setDefaultSkillsMode(detail.defaults.skills.mode === 'auto' ? 'auto' : 'fixed');
+      setDefaultMcpMode(detail.defaults.mcps.mode === 'fixed' ? 'fixed' : 'auto');
+      setSelectedMcpIds(detail.defaults.mcps.value ?? []);
       setAvailableSkills(skillsList);
       setBuiltinAutoSkills(autoSkills);
+      setAvailableMcpServers(mcpServers);
       setSelectedSkills(detail.capabilities.default_skill_ids ?? []);
       setCustomSkills(isBuiltinAssistant(assistant) ? [] : (detail.capabilities.custom_skill_names ?? []));
       setDisabledBuiltinSkills(detail.capabilities.default_disabled_builtin_skill_ids ?? []);
@@ -131,6 +144,7 @@ export const useAssistantEditor = ({
       resetDefaultConfigState();
       setAvailableSkills([]);
       setBuiltinAutoSkills([]);
+      setAvailableMcpServers([]);
       resetSkillEditorState();
     }
   };
@@ -149,16 +163,19 @@ export const useAssistantEditor = ({
     resetSkillEditorState();
 
     try {
-      const [skillsList, autoSkills] = await Promise.all([
+      const [skillsList, autoSkills, mcpServers] = await Promise.all([
         ipcBridge.fs.listAvailableSkills.invoke(),
         ipcBridge.fs.listBuiltinAutoSkills.invoke(),
+        ipcBridge.mcpService.listServers.invoke(),
       ]);
       setAvailableSkills(skillsList);
       setBuiltinAutoSkills(autoSkills);
+      setAvailableMcpServers(mcpServers);
     } catch (error) {
       console.error('Failed to load skills:', error);
       setAvailableSkills([]);
       setBuiltinAutoSkills([]);
+      setAvailableMcpServers([]);
     }
   };
 
@@ -175,15 +192,19 @@ export const useAssistantEditor = ({
     resetSkillEditorState();
 
     try {
-      const { detail, skillsList, autoSkills } = await loadEditorResources(assistant.id);
+      const { detail, skillsList, autoSkills, mcpServers } = await loadEditorResources(assistant.id);
       setEditContext(detail.rules.content || '');
       setEditRecommendedPromptsText((detail.prompts.recommended ?? []).join('\n'));
       setDefaultModelMode(detail.defaults.model.mode === 'fixed' ? 'fixed' : 'auto');
       setDefaultModelValue(detail.defaults.model.value || '');
       setDefaultPermissionMode(detail.defaults.permission.mode === 'fixed' ? 'fixed' : 'auto');
       setDefaultPermissionValue(detail.defaults.permission.value || '');
+      setDefaultSkillsMode(detail.defaults.skills.mode === 'auto' ? 'auto' : 'fixed');
+      setDefaultMcpMode(detail.defaults.mcps.mode === 'fixed' ? 'fixed' : 'auto');
+      setSelectedMcpIds(detail.defaults.mcps.value ?? []);
       setAvailableSkills(skillsList);
       setBuiltinAutoSkills(autoSkills);
+      setAvailableMcpServers(mcpServers);
       setSelectedSkills(detail.capabilities.default_skill_ids ?? []);
       setCustomSkills(detail.capabilities.custom_skill_names ?? []);
       setDisabledBuiltinSkills(detail.capabilities.default_disabled_builtin_skill_ids ?? []);
@@ -193,6 +214,7 @@ export const useAssistantEditor = ({
       resetDefaultConfigState();
       setAvailableSkills([]);
       setBuiltinAutoSkills([]);
+      setAvailableMcpServers([]);
       resetSkillEditorState();
     }
   };
@@ -281,6 +303,8 @@ export const useAssistantEditor = ({
           defaultPermissionMode === 'fixed'
             ? { mode: 'fixed', value: defaultPermissionValue.trim() }
             : { mode: 'auto' },
+        skills: { mode: defaultSkillsMode, value: selectedSkills },
+        mcps: { mode: defaultMcpMode, value: selectedMcpIds },
       };
 
       if (isCreating) {
@@ -416,6 +440,13 @@ export const useAssistantEditor = ({
     setDefaultPermissionMode,
     defaultPermissionValue,
     setDefaultPermissionValue,
+    defaultSkillsMode,
+    setDefaultSkillsMode,
+    defaultMcpMode,
+    setDefaultMcpMode,
+    availableMcpServers,
+    selectedMcpIds,
+    setSelectedMcpIds,
     isCreating,
     deleteConfirmVisible,
     setDeleteConfirmVisible,

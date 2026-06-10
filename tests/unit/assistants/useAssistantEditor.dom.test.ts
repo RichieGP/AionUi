@@ -20,6 +20,9 @@ vi.mock('@/common', () => ({
       delete: { invoke: vi.fn() },
       setState: { invoke: vi.fn() },
     },
+    mcpService: {
+      listServers: { invoke: vi.fn() },
+    },
     fs: {
       readAssistantRule: { invoke: vi.fn() },
       readAssistantSkill: { invoke: vi.fn() },
@@ -73,11 +76,11 @@ describe('useAssistantEditor', () => {
     defaults: {
       model: { mode: 'fixed', value: 'gemini-2.5-pro' },
       permission: { mode: 'fixed', value: 'acceptEdits' },
-      skills: { mode: 'fixed', value: [] },
-      mcps: { mode: 'fixed', value: [] },
+      skills: { mode: 'auto', value: ['skill-one'] },
+      mcps: { mode: 'fixed', value: ['mcp-a'] },
     },
     capabilities: {
-      default_skill_ids: [],
+      default_skill_ids: ['skill-one'],
       custom_skill_names: [],
       default_disabled_builtin_skill_ids: [],
     },
@@ -112,6 +115,9 @@ describe('useAssistantEditor', () => {
     (ipcBridge.assistants.get.invoke as any).mockResolvedValue(mockAssistantDetail);
     (ipcBridge.fs.listAvailableSkills.invoke as any).mockResolvedValue([]);
     (ipcBridge.fs.listBuiltinAutoSkills.invoke as any).mockResolvedValue([]);
+    (ipcBridge.mcpService.listServers.invoke as any).mockResolvedValue([
+      { id: 'mcp-a', name: 'Server A', enabled: true },
+    ]);
     (ipcBridge.fs.writeAssistantRule.invoke as any).mockResolvedValue(true);
     (ipcBridge.fs.deleteAssistantRule.invoke as any).mockResolvedValue(true);
     (ipcBridge.fs.importSkillWithSymlink.invoke as any).mockResolvedValue(true);
@@ -154,6 +160,9 @@ describe('useAssistantEditor', () => {
     expect(result.current.defaultModelValue).toBe('gemini-2.5-pro');
     expect(result.current.defaultPermissionMode).toBe('fixed');
     expect(result.current.defaultPermissionValue).toBe('acceptEdits');
+    expect(result.current.defaultSkillsMode).toBe('auto');
+    expect(result.current.defaultMcpMode).toBe('fixed');
+    expect(result.current.selectedMcpIds).toEqual(['mcp-a']);
     expect(result.current.isCreating).toBe(false);
   });
 
@@ -192,6 +201,10 @@ describe('useAssistantEditor', () => {
       result.current.setDefaultModelValue('gpt-4.1');
       result.current.setDefaultPermissionMode('fixed');
       result.current.setDefaultPermissionValue('plan');
+      result.current.setDefaultSkillsMode('auto');
+      result.current.setSelectedSkills(['skill-one']);
+      result.current.setDefaultMcpMode('fixed');
+      result.current.setSelectedMcpIds(['mcp-a']);
     });
 
     await act(async () => {
@@ -205,6 +218,8 @@ describe('useAssistantEditor', () => {
         defaults: {
           model: { mode: 'fixed', value: 'gpt-4.1' },
           permission: { mode: 'fixed', value: 'plan' },
+          skills: { mode: 'auto', value: ['skill-one'] },
+          mcps: { mode: 'fixed', value: ['mcp-a'] },
         },
       })
     );

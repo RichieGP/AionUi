@@ -1,4 +1,5 @@
 import type { AssistantListItem, BuiltinAutoSkill, SkillInfo } from './types';
+import type { IMcpServer } from '@/common/config/storage';
 import type { AvailableBackend } from '@/renderer/hooks/assistant';
 import { useModelProviderList } from '@/renderer/hooks/agent/useModelProviderList';
 import EmojiPicker from '@/renderer/components/chat/EmojiPicker';
@@ -31,6 +32,13 @@ export type AssistantEditorSectionsProps = {
   setDefaultPermissionMode: (value: 'auto' | 'fixed') => void;
   defaultPermissionValue: string;
   setDefaultPermissionValue: (value: string) => void;
+  defaultSkillsMode: 'auto' | 'fixed';
+  setDefaultSkillsMode: (value: 'auto' | 'fixed') => void;
+  defaultMcpMode: 'auto' | 'fixed';
+  setDefaultMcpMode: (value: 'auto' | 'fixed') => void;
+  availableMcpServers: IMcpServer[];
+  selectedMcpIds: string[];
+  setSelectedMcpIds: (value: string[]) => void;
   editContext: string;
   setEditContext: (value: string) => void;
   promptViewMode: 'edit' | 'preview';
@@ -71,6 +79,13 @@ const AssistantEditorSections: React.FC<AssistantEditorSectionsProps> = ({
   setDefaultPermissionMode,
   defaultPermissionValue,
   setDefaultPermissionValue,
+  defaultSkillsMode,
+  setDefaultSkillsMode,
+  defaultMcpMode,
+  setDefaultMcpMode,
+  availableMcpServers,
+  selectedMcpIds,
+  setSelectedMcpIds,
   editContext,
   setEditContext,
   promptViewMode,
@@ -157,6 +172,7 @@ const AssistantEditorSections: React.FC<AssistantEditorSectionsProps> = ({
     }))
   );
   const permissionOptions = getAgentModes(editAgent);
+  const enabledMcpServers = availableMcpServers.filter((server) => server.enabled !== false);
 
   return (
     <div className='flex flex-col gap-16px bg-fill-2 rounded-16px p-20px'>
@@ -475,6 +491,22 @@ const AssistantEditorSections: React.FC<AssistantEditorSectionsProps> = ({
             )}
           </div>
 
+          <div className='mb-12px'>
+            <Select
+              value={defaultSkillsMode}
+              onChange={(value) => setDefaultSkillsMode(value as 'auto' | 'fixed')}
+              disabled={!isDefaultsEditable}
+              data-testid='select-assistant-default-skills-mode'
+            >
+              <Select.Option value='fixed'>
+                {t('settings.assistantUseFixedValue', { defaultValue: 'Use fixed value' })}
+              </Select.Option>
+              <Select.Option value='auto'>
+                {t('settings.assistantRememberLastUsed', { defaultValue: 'Remember last used' })}
+              </Select.Option>
+            </Select>
+          </div>
+
           <Collapse defaultActiveKey={['custom-skills']} data-testid='skills-collapse'>
             <Collapse.Item
               header={
@@ -752,6 +784,55 @@ const AssistantEditorSections: React.FC<AssistantEditorSectionsProps> = ({
           </Collapse>
         </div>
       )}
+
+      <div className='flex-shrink-0'>
+        <div className='flex items-center justify-between'>
+          <Typography.Text bold>
+            {t('settings.assistantDefaultMcpLabel', { defaultValue: 'Default MCP' })}
+          </Typography.Text>
+          <Button
+            type='text'
+            size='mini'
+            onClick={() => navigate('/settings/capabilities?tab=tools')}
+            data-testid='btn-open-mcp-settings'
+          >
+            {t('settings.assistantOpenMcpSettings', { defaultValue: 'Open MCP settings' })}
+          </Button>
+        </div>
+        <div className='mt-10px flex flex-col gap-10px'>
+          <Select
+            value={defaultMcpMode}
+            onChange={(value) => setDefaultMcpMode(value as 'auto' | 'fixed')}
+            disabled={!isDefaultsEditable}
+            data-testid='select-assistant-default-mcp-mode'
+          >
+            <Select.Option value='auto'>
+              {t('settings.assistantRememberLastUsed', { defaultValue: 'Remember last used' })}
+            </Select.Option>
+            <Select.Option value='fixed'>
+              {t('settings.assistantUseFixedValue', { defaultValue: 'Use fixed value' })}
+            </Select.Option>
+          </Select>
+          <Select
+            mode='multiple'
+            value={selectedMcpIds}
+            onChange={(value) => setSelectedMcpIds((value as string[]) ?? [])}
+            disabled={!isDefaultsEditable || defaultMcpMode !== 'fixed'}
+            allowClear
+            placeholder={t('settings.assistantSelectDefaultMcp', { defaultValue: 'Select MCP servers' })}
+            notFoundContent={t('settings.assistantNoAvailableMcps', {
+              defaultValue: 'No enabled MCP servers are available.',
+            })}
+            data-testid='select-assistant-default-mcp'
+          >
+            {enabledMcpServers.map((server) => (
+              <Select.Option key={server.id} value={server.id}>
+                {server.name}
+              </Select.Option>
+            ))}
+          </Select>
+        </div>
+      </div>
 
       {activeAssistant && isExtensionAssistant(activeAssistant) && (
         <div className='text-12px text-t-tertiary'>
