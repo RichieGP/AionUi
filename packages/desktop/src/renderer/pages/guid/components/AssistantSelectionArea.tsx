@@ -4,13 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import coworkSvg from '@/renderer/assets/icons/cowork.svg';
 import { ipcBridge } from '@/common';
-import { useDetectedAgents, useAssistantEditor, useAssistantList } from '@/renderer/hooks/assistant';
-import AssistantEditDrawer from '@/renderer/pages/settings/AssistantSettings/AssistantEditDrawer';
-import DeleteAssistantModal from '@/renderer/pages/settings/AssistantSettings/DeleteAssistantModal';
-import SkillConfirmModals from '@/renderer/pages/settings/AssistantSettings/SkillConfirmModals';
-import { resolveAvatarImageSrc } from '@/renderer/pages/settings/AssistantSettings/assistantUtils';
 import { CUSTOM_AVATAR_IMAGE_MAP } from '../constants';
 import styles from '../index.module.css';
 import type { AvailableAgent, EffectiveAgentInfo } from '../types';
@@ -47,6 +41,8 @@ const resolveAssistantCandidateIds = (assistantId: string): string[] => {
   return Array.from(new Set([assistantId, `builtin-${stripped}`, stripped]));
 };
 
+const OPEN_ASSISTANT_EDITOR_INTENT_KEY = 'guid.openAssistantEditorIntent';
+
 const AssistantSelectionArea: React.FC<AssistantSelectionAreaProps> = ({
   is_presetAgent,
   selectedAgentKey,
@@ -62,35 +58,6 @@ const AssistantSelectionArea: React.FC<AssistantSelectionAreaProps> = ({
   const { t } = useTranslation();
   const navigate = useNavigate();
   const [agentMessage, agentMessageContext] = Message.useMessage({ maxCount: 10 });
-
-  const avatarImageMap: Record<string, string> = useMemo(
-    () => ({
-      'cowork.svg': coworkSvg,
-      '\u{1F6E0}\u{FE0F}': coworkSvg,
-    }),
-    []
-  );
-
-  // Internal useAssistantList owns the assistant editor's working state. Its
-  // `assistants` list is the same backend catalog we receive via the
-  // `assistants` prop (both sourced from ipcBridge.assistants.list), so we
-  // drop it here to avoid a parallel fetch and prop shadow; lookups for the
-  // editor target use the prop.
-  const { activeAssistantId, setActiveAssistantId, activeAssistant, isExtensionAssistant, loadAssistants } =
-    useAssistantList();
-  const { availableBackends, refreshAgentDetection } = useDetectedAgents();
-
-  const editor = useAssistantEditor({
-    localeKey,
-    activeAssistant,
-    isExtensionAssistant,
-    setActiveAssistantId,
-    loadAssistants,
-    refreshAgentDetection,
-    message: agentMessage,
-  });
-
-  const editAvatarImage = resolveAvatarImageSrc(editor.editAvatar, avatarImageMap);
   const selectedAssistantId = selectedAgentInfo?.custom_agent_id ?? null;
   const { data: selectedAssistantDetail } = useSWR(
     is_presetAgent && selectedAssistantId ? `guid.assistant.detail.${selectedAssistantId}.${localeKey}` : null,
@@ -98,84 +65,6 @@ const AssistantSelectionArea: React.FC<AssistantSelectionAreaProps> = ({
       ipcBridge.assistants.get
         .invoke({ id: selectedAssistantId!, locale: localeKey })
         .catch((_error: unknown): AssistantDetail | null => null)
-  );
-
-  const modalTree = (
-    <>
-      {agentMessageContext}
-      <AssistantEditDrawer
-        editVisible={editor.editVisible}
-        setEditVisible={editor.setEditVisible}
-        isCreating={editor.isCreating}
-        editName={editor.editName}
-        setEditName={editor.setEditName}
-        editDescription={editor.editDescription}
-        setEditDescription={editor.setEditDescription}
-        editAvatar={editor.editAvatar}
-        setEditAvatar={editor.setEditAvatar}
-        editAvatarImage={editAvatarImage}
-        editAgent={editor.editAgent}
-        setEditAgent={editor.setEditAgent}
-        editRecommendedPromptsText={editor.editRecommendedPromptsText}
-        setEditRecommendedPromptsText={editor.setEditRecommendedPromptsText}
-        defaultModelMode={editor.defaultModelMode}
-        setDefaultModelMode={editor.setDefaultModelMode}
-        defaultModelValue={editor.defaultModelValue}
-        setDefaultModelValue={editor.setDefaultModelValue}
-        defaultPermissionMode={editor.defaultPermissionMode}
-        setDefaultPermissionMode={editor.setDefaultPermissionMode}
-        defaultPermissionValue={editor.defaultPermissionValue}
-        setDefaultPermissionValue={editor.setDefaultPermissionValue}
-        defaultSkillsMode={editor.defaultSkillsMode}
-        setDefaultSkillsMode={editor.setDefaultSkillsMode}
-        defaultMcpMode={editor.defaultMcpMode}
-        setDefaultMcpMode={editor.setDefaultMcpMode}
-        availableMcpServers={editor.availableMcpServers}
-        selectedMcpIds={editor.selectedMcpIds}
-        setSelectedMcpIds={editor.setSelectedMcpIds}
-        editContext={editor.editContext}
-        setEditContext={editor.setEditContext}
-        promptViewMode={editor.promptViewMode}
-        setPromptViewMode={editor.setPromptViewMode}
-        availableSkills={editor.availableSkills}
-        selectedSkills={editor.selectedSkills}
-        setSelectedSkills={editor.setSelectedSkills}
-        pendingSkills={editor.pendingSkills}
-        customSkills={editor.customSkills}
-        setDeletePendingSkillName={editor.setDeletePendingSkillName}
-        setDeleteCustomSkillName={editor.setDeleteCustomSkillName}
-        builtinAutoSkills={editor.builtinAutoSkills}
-        disabledBuiltinSkills={editor.disabledBuiltinSkills}
-        setDisabledBuiltinSkills={editor.setDisabledBuiltinSkills}
-        activeAssistant={activeAssistant}
-        activeAssistantId={activeAssistantId}
-        isExtensionAssistant={isExtensionAssistant}
-        availableBackends={availableBackends}
-        handleSave={editor.handleSave}
-        handleDeleteClick={editor.handleDeleteClick}
-        handleDuplicate={(assistant) => void editor.handleDuplicate(assistant)}
-      />
-      <DeleteAssistantModal
-        visible={editor.deleteConfirmVisible}
-        onCancel={() => editor.setDeleteConfirmVisible(false)}
-        onConfirm={editor.handleDeleteConfirm}
-        activeAssistant={activeAssistant}
-        avatarImageMap={avatarImageMap}
-      />
-      <SkillConfirmModals
-        deletePendingSkillName={editor.deletePendingSkillName}
-        setDeletePendingSkillName={editor.setDeletePendingSkillName}
-        pendingSkills={editor.pendingSkills}
-        setPendingSkills={editor.setPendingSkills}
-        deleteCustomSkillName={editor.deleteCustomSkillName}
-        setDeleteCustomSkillName={editor.setDeleteCustomSkillName}
-        customSkills={editor.customSkills}
-        setCustomSkills={editor.setCustomSkills}
-        selectedSkills={editor.selectedSkills}
-        setSelectedSkills={editor.setSelectedSkills}
-        message={agentMessage}
-      />
-    </>
   );
 
   const resolveOpenAssistantId = (): string | null => {
@@ -206,8 +95,24 @@ const AssistantSelectionArea: React.FC<AssistantSelectionAreaProps> = ({
       return;
     }
 
-    void editor.handleEdit(targetAssistant);
-  }, [agentMessage, assistants, editor, selectedAgentInfo?.custom_agent_id, selectedAgentKey, t]);
+    const intent = {
+      assistantId: targetAssistant.id,
+      openAssistantEditor: true,
+    };
+
+    try {
+      sessionStorage.setItem(OPEN_ASSISTANT_EDITOR_INTENT_KEY, JSON.stringify(intent));
+    } catch (error) {
+      console.error('[AssistantSelectionArea] Failed to persist assistant open intent:', error);
+    }
+
+    navigate('/settings/assistants', {
+      state: {
+        openAssistantId: targetAssistant.id,
+        openAssistantEditor: true,
+      },
+    });
+  }, [agentMessage, assistants, navigate, selectedAgentInfo?.custom_agent_id, selectedAgentKey, t]);
 
   useLayoutEffect(() => {
     if (!onRegisterOpenDetails) return;
@@ -292,7 +197,6 @@ const AssistantSelectionArea: React.FC<AssistantSelectionAreaProps> = ({
             return null;
           })()}
         </div>
-        {modalTree}
       </div>
     );
   }
@@ -361,7 +265,6 @@ const AssistantSelectionArea: React.FC<AssistantSelectionAreaProps> = ({
           </div>
         </div>
       </div>
-      {modalTree}
     </div>
   );
 };
