@@ -106,10 +106,6 @@ vi.mock('@/renderer/hooks/assistant', () => ({
   }),
 }));
 
-vi.mock('@/renderer/pages/settings/AssistantSettings/AssistantEditDrawer', () => ({
-  default: () => null,
-}));
-
 vi.mock('@/renderer/pages/settings/AssistantSettings/DeleteAssistantModal', () => ({
   default: () => null,
 }));

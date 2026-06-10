@@ -20,7 +20,6 @@
 import { Message } from '@arco-design/web-react';
 import coworkSvg from '@/renderer/assets/icons/cowork.svg';
 import AionScrollArea from '@/renderer/components/base/AionScrollArea';
-import { useSettingsViewMode } from '@/renderer/components/settings/SettingsModal/settingsViewContext';
 import { useDetectedAgents, useAssistantEditor, useAssistantList } from '@/renderer/hooks/assistant';
 import SettingsPageWrapper from '../components/SettingsPageWrapper';
 import { resolveAvatarImageSrc } from './assistantUtils';
@@ -39,8 +38,6 @@ const OPEN_ASSISTANT_EDITOR_INTENT_KEY = 'guid.openAssistantEditorIntent';
 
 const AssistantSettings: React.FC = () => {
   const [message, messageContext] = Message.useMessage({ maxCount: 10 });
-  const viewMode = useSettingsViewMode();
-  const isPageMode = viewMode === 'page';
   const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
   const navigationState = (location.state as AssistantNavigationState | null) ?? null;
@@ -122,7 +119,7 @@ const AssistantSettings: React.FC = () => {
     <SettingsPageWrapper>
       <div className='flex flex-col h-full w-full'>
         {messageContext}
-        <AionScrollArea className='flex-1 min-h-0 pb-16px scrollbar-hide' disableOverflow={isPageMode}>
+        <AionScrollArea className='flex-1 min-h-0 scrollbar-hide' disableOverflow={true}>
           {showEditor ? (
             <AssistantEditorPage
               isCreating={editor.isCreating}

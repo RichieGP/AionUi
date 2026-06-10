@@ -65,6 +65,8 @@ describe('AssistantListPanel', () => {
     const { container } = renderWithProviders(<AssistantListPanel {...defaultProps} />);
     expect(container.querySelector('[data-testid="btn-create-assistant"]')).toBeInTheDocument();
     expect(screen.getByTestId('assistant-list-shell')).toBeInTheDocument();
+    expect(screen.getByTestId('assistant-list-header')).toBeInTheDocument();
+    expect(screen.getByTestId('assistant-list-body')).toBeInTheDocument();
     expect(screen.getByTestId('assistant-card-1')).toBeInTheDocument();
   });
 

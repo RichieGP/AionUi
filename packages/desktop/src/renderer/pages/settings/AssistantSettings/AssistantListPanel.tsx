@@ -281,12 +281,12 @@ const AssistantListPanel: React.FC<AssistantListPanelProps> = ({
   };
 
   return (
-    <div className='py-2'>
+    <div data-testid='assistant-list-shell' className='flex h-full min-h-0 flex-col overflow-hidden bg-bg-0'>
       <div
-        data-testid='assistant-list-shell'
-        className={`mx-auto w-full max-w-760px ${isMobile ? 'px-8px py-12px' : 'px-4px py-18px'}`}
+        data-testid='assistant-list-header'
+        className={`sticky top-0 z-10 border-b border-border-2 bg-bg-0 ${isMobile ? 'px-8px py-12px' : 'px-18px py-18px'}`}
       >
-        <div className='mb-18px flex flex-col gap-14px'>
+        <div className='mx-auto w-full max-w-760px'>
           <div className={`flex gap-12px ${isMobile ? 'flex-col' : 'items-start justify-between'}`}>
             <div className='min-w-0'>
               <h2 className='m-0 text-16px font-600 leading-[1.2] text-t-primary'>
@@ -312,24 +312,31 @@ const AssistantListPanel: React.FC<AssistantListPanelProps> = ({
             </div>
           </div>
         </div>
+      </div>
 
-        {listAssistants.length > 0 ? (
-          <div className='space-y-16px'>
-            {renderList(listAssistants)}
-            <div className='rounded-16px bg-fill-1 px-24px py-20px text-14px text-t-secondary'>
-              {t('settings.assistantListHint', {
-                defaultValue:
-                  'Drag the handle on each row to update assistant order. Changes affect the home assistant list immediately.',
+      <div
+        data-testid='assistant-list-body'
+        className={`min-h-0 flex-1 overflow-auto ${isMobile ? 'px-8px py-12px' : 'px-18px py-18px pb-24px'}`}
+      >
+        <div className='mx-auto w-full max-w-760px'>
+          {listAssistants.length > 0 ? (
+            <div className='space-y-16px'>
+              {renderList(listAssistants)}
+              <div className='rounded-16px bg-fill-1 px-24px py-20px text-14px text-t-secondary'>
+                {t('settings.assistantListHint', {
+                  defaultValue:
+                    'Drag the handle on each row to update assistant order. Changes affect the home assistant list immediately.',
+                })}
+              </div>
+            </div>
+          ) : (
+            <div className='py-12px text-center text-t-secondary'>
+              {t('settings.assistantNoMatch', {
+                defaultValue: 'No assistants match the current filters.',
               })}
             </div>
-          </div>
-        ) : (
-          <div className='text-center text-t-secondary py-12px'>
-            {t('settings.assistantNoMatch', {
-              defaultValue: 'No assistants match the current filters.',
-            })}
-          </div>
-        )}
+          )}
+        </div>
       </div>
     </div>
   );
