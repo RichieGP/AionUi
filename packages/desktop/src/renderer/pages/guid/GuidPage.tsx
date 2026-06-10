@@ -172,7 +172,6 @@ const GuidPage: React.FC = () => {
     // Agent helpers
     findAgentByKey: agentSelection.findAgentByKey,
     getEffectiveAgentType: agentSelection.getEffectiveAgentType,
-    resolvePresetRulesAndSkills: agentSelection.resolvePresetRulesAndSkills,
     resolveEnabledSkills: agentSelection.resolveEnabledSkills,
     resolveDisabledBuiltinSkills: agentSelection.resolveDisabledBuiltinSkills,
     guidDisabledBuiltinSkills,
@@ -191,6 +190,7 @@ const GuidPage: React.FC = () => {
     // Navigation
     navigate,
     t,
+    localeKey,
   });
 
   // --- Coordinated handlers (depend on multiple hooks) ---

@@ -13,6 +13,14 @@ export type BuildAgentConversationPresetResources = {
   exclude_auto_inject_skills?: string[];
 };
 
+export type BuildAgentConversationAssistantOverrides = {
+  model?: string;
+  permission?: string;
+  skill_ids?: string[];
+  disabled_builtin_skill_ids?: string[];
+  mcp_ids?: string[];
+};
+
 export type BuildAgentConversationInput = {
   backend: string;
   name: string;
@@ -29,6 +37,8 @@ export type BuildAgentConversationInput = {
   preset_resources?: BuildAgentConversationPresetResources;
   session_mode?: string;
   current_model_id?: string;
+  assistant_locale?: string;
+  assistant_overrides?: BuildAgentConversationAssistantOverrides;
   extra?: Partial<ICreateConversationParams['extra']>;
 };
 
@@ -50,9 +60,10 @@ export function buildAgentConversationParams(input: BuildAgentConversationInput)
     custom_workspace = true,
     is_preset = false,
     preset_agent_type,
-    preset_resources,
     session_mode,
     current_model_id,
+    assistant_locale,
+    assistant_overrides,
     extra: extraOverrides,
   } = input;
 
@@ -66,16 +77,9 @@ export function buildAgentConversationParams(input: BuildAgentConversationInput)
   };
 
   if (is_preset) {
-    // Transient create-request fields: backend's create handler consumes
-    // them to compute extra.skills, then strips before persistence.
-    if (preset_resources?.enabled_skills?.length) {
-      extra.preset_enabled_skills = preset_resources.enabled_skills;
+    if (effectivePresetAssistantId) {
+      extra.assistant_id = effectivePresetAssistantId;
     }
-    if (preset_resources?.exclude_auto_inject_skills?.length) {
-      extra.exclude_auto_inject_skills = preset_resources.exclude_auto_inject_skills;
-    }
-    extra.preset_assistant_id = effectivePresetAssistantId;
-    extra.preset_context = preset_resources?.rules;
     if (type === 'acp') {
       extra.backend = effectivePresetType as string;
     }
@@ -86,9 +90,12 @@ export function buildAgentConversationParams(input: BuildAgentConversationInput)
     if (cli_path) extra.cli_path = cli_path;
     if (custom_agent_id) {
       extra.custom_agent_id = custom_agent_id;
+      extra.assistant_id = custom_agent_id;
     }
   }
 
+  if (assistant_locale) extra.assistant_locale = assistant_locale;
+  if (assistant_overrides) extra.assistant_overrides = assistant_overrides;
   if (session_mode) extra.session_mode = session_mode;
   if (current_model_id) extra.current_model_id = current_model_id;
 

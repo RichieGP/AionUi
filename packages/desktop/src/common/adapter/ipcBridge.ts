@@ -1403,6 +1403,15 @@ export interface ICreateConversationParams {
     context?: string;
     context_file_name?: string;
     preset_rules?: string;
+    assistant_id?: string;
+    assistant_locale?: string;
+    assistant_overrides?: {
+      model?: string;
+      permission?: string;
+      skill_ids?: string[];
+      disabled_builtin_skill_ids?: string[];
+      mcp_ids?: string[];
+    };
     /** Transient: preset opt-in skills. Consumed by backend create handler
      *  and stripped before persistence. */
     preset_enabled_skills?: string[];

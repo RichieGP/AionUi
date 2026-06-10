@@ -43,9 +43,6 @@ export type GuidSendDeps = {
   getEffectiveAgentType: (
     agentInfo: { agent_type: string; backend?: string; custom_agent_id?: string } | undefined
   ) => EffectiveAgentInfo;
-  resolvePresetRulesAndSkills: (
-    agentInfo: { agent_type: string; backend?: string; custom_agent_id?: string; context?: string } | undefined
-  ) => Promise<{ rules?: string; skills?: string }>;
   resolveEnabledSkills: (
     agentInfo: { agent_type: string; backend?: string; custom_agent_id?: string } | undefined
   ) => string[] | undefined;
@@ -68,6 +65,7 @@ export type GuidSendDeps = {
   // Navigation
   navigate: NavigateFunction;
   t: TFunction;
+  localeKey: string;
 };
 
 export type GuidSendResult = {
@@ -99,7 +97,6 @@ export const useGuidSend = (deps: GuidSendDeps): GuidSendResult => {
     current_model,
     findAgentByKey,
     getEffectiveAgentType,
-    resolvePresetRulesAndSkills,
     resolveEnabledSkills,
     resolveDisabledBuiltinSkills,
     guidDisabledBuiltinSkills,
@@ -114,6 +111,7 @@ export const useGuidSend = (deps: GuidSendDeps): GuidSendResult => {
     setMentionActiveIndex,
     navigate,
     t,
+    localeKey,
   } = deps;
   const sendingRef = useRef(false);
 
@@ -127,7 +125,6 @@ export const useGuidSend = (deps: GuidSendDeps): GuidSendResult => {
 
     const { agent_type: effectiveAgentType } = getEffectiveAgentType(agentInfo);
 
-    const { rules: preset_rules } = await resolvePresetRulesAndSkills(agentInfo);
     // Guid page's per-conversation skill overrides take precedence over the
     // assistant's saved defaults. The combined skills menu lets the user pick
     // any custom skill — not just preset-declared ones — so for non-preset
@@ -153,6 +150,11 @@ export const useGuidSend = (deps: GuidSendDeps): GuidSendResult => {
       .map((server) => toSessionMcpServer(server));
 
     const finalEffectiveAgentType = effectiveAgentType;
+    const assistantOverrides = {
+      model: selectedAcpModel || currentAcpCachedModelInfo?.current_model_id || current_model?.use_model || undefined,
+      skill_ids: enabled_skills_to_send,
+      disabled_builtin_skill_ids: excludeBuiltinSkills,
+    };
 
     // Aionrs path (direct selection or preset assistant with aionrs as main agent)
     if (selectedAgent === 'aionrs' || (is_preset && finalEffectiveAgentType === 'aionrs')) {
@@ -169,9 +171,9 @@ export const useGuidSend = (deps: GuidSendDeps): GuidSendResult => {
             default_files: files,
             workspace: finalWorkspace,
             custom_workspace: isCustomWorkspace,
-            preset_rules: is_preset ? preset_rules : undefined,
-            preset_enabled_skills: enabled_skills_to_send,
-            exclude_auto_inject_skills: excludeBuiltinSkills,
+            assistant_id: preset_assistant_id,
+            assistant_locale: localeKey,
+            assistant_overrides: is_preset ? { ...assistantOverrides, mcp_ids: selectedUserMcpServerIds } : undefined,
             selected_mcp_server_ids: selectedUserMcpServerIds,
             // aionrs should consume the authoritative session snapshot, just
             // like team MCP does, instead of reloading only user servers from
@@ -244,24 +246,17 @@ export const useGuidSend = (deps: GuidSendDeps): GuidSendResult => {
         custom_workspace: isCustomWorkspace,
         is_preset,
         preset_agent_type: finalEffectiveAgentType,
-        preset_resources: is_preset
-          ? {
-              rules: preset_rules,
-              enabled_skills,
-              exclude_auto_inject_skills: excludeBuiltinSkills,
-            }
-          : undefined,
         session_mode: selectedMode,
         current_model_id: selectedAcpModel || currentAcpCachedModelInfo?.current_model_id || undefined,
+        assistant_locale: localeKey,
+        assistant_overrides: {
+          ...assistantOverrides,
+          mcp_ids: selectedUserMcpServerIds,
+        },
         extra: {
           default_files: files,
-          exclude_auto_inject_skills: excludeBuiltinSkills,
           selected_mcp_server_ids: selectedUserMcpServerIds,
           selected_session_mcp_servers: selectedSessionMcpServers,
-          // Non-preset agents still forward user-selected custom skills via the
-          // shared backend slot. For preset assistants this is already wired
-          // through `preset_resources.enabled_skills` above.
-          ...(is_preset ? {} : guidEnabledSkills?.length ? { preset_enabled_skills: guidEnabledSkills } : {}),
         },
       });
 
@@ -304,7 +299,6 @@ export const useGuidSend = (deps: GuidSendDeps): GuidSendResult => {
     current_model,
     findAgentByKey,
     getEffectiveAgentType,
-    resolvePresetRulesAndSkills,
     resolveEnabledSkills,
     resolveDisabledBuiltinSkills,
     guidDisabledBuiltinSkills,
@@ -312,6 +306,7 @@ export const useGuidSend = (deps: GuidSendDeps): GuidSendResult => {
     selectedMcpServerIds,
     navigate,
     t,
+    localeKey,
   ]);
 
   const sendMessageHandler = useCallback(() => {
