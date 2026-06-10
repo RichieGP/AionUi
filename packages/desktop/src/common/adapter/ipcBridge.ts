@@ -27,6 +27,7 @@ import type {
 } from '../config/storage';
 import type {
   Assistant,
+  AssistantDetail,
   CreateAssistantRequest,
   ImportAssistantsRequest,
   ImportAssistantsResult,
@@ -115,6 +116,10 @@ export const shell = {
 
 export const assistants = {
   list: httpGet<Assistant[], void>('/api/assistants'),
+  get: httpGet<AssistantDetail, { id: string; locale?: string }>(
+    ({ id, locale }) =>
+      `/api/assistants/${encodeURIComponent(id)}${locale ? `?locale=${encodeURIComponent(locale)}` : ''}`
+  ),
   create: httpPost<Assistant, CreateAssistantRequest>('/api/assistants'),
   update: httpPut<Assistant, UpdateAssistantRequest>((p) => `/api/assistants/${p.id}`),
   delete: httpDelete<void, { id: string }>((p) => `/api/assistants/${p.id}`),

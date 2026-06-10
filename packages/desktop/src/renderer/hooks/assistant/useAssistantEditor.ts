@@ -1,6 +1,6 @@
 import { ipcBridge } from '@/common';
-import type { Message } from '@arco-design/web-react';
 import type { Assistant, CreateAssistantRequest, UpdateAssistantRequest } from '@/common/types/agent/assistantTypes';
+import type { Message } from '@arco-design/web-react';
 import type {
   AssistantListItem,
   BuiltinAutoSkill,
@@ -37,20 +37,16 @@ export const useAssistantEditor = ({
 }: UseAssistantEditorParams) => {
   const { t } = useTranslation();
 
-  // Edit drawer state
   const [editVisible, setEditVisible] = useState(false);
   const [editName, setEditName] = useState('');
   const [editDescription, setEditDescription] = useState('');
   const [editContext, setEditContext] = useState('');
   const [editAvatar, setEditAvatar] = useState('');
-  // editAgent holds a backend ID (e.g. "claude", "goose") or an extension adapter ID (e.g. "ext-buddy")
   const [editAgent, setEditAgent] = useState<string>('claude');
-  const [editSkills, setEditSkills] = useState('');
   const [isCreating, setIsCreating] = useState(false);
   const [deleteConfirmVisible, setDeleteConfirmVisible] = useState(false);
   const [promptViewMode, setPromptViewMode] = useState<'edit' | 'preview'>('preview');
 
-  // Skills-related editing state (shared with editor)
   const [availableSkills, setAvailableSkills] = useState<SkillInfo[]>([]);
   const [customSkills, setCustomSkills] = useState<string[]>([]);
   const [selectedSkills, setSelectedSkills] = useState<string[]>([]);
@@ -58,113 +54,79 @@ export const useAssistantEditor = ({
   const [deletePendingSkillName, setDeletePendingSkillName] = useState<string | null>(null);
   const [deleteCustomSkillName, setDeleteCustomSkillName] = useState<string | null>(null);
 
-  // Builtin auto-injected skills state
   const [builtinAutoSkills, setBuiltinAutoSkills] = useState<BuiltinAutoSkill[]>([]);
   const [disabledBuiltinSkills, setDisabledBuiltinSkills] = useState<string[]>([]);
 
-  // Load assistant rule content from file
-  const loadAssistantContext = useCallback(
-    async (assistantId: string): Promise<string> => {
-      try {
-        const content = await ipcBridge.fs.readAssistantRule.invoke({ assistant_id: assistantId, locale: localeKey });
-        return content || '';
-      } catch (error) {
-        console.error(`Failed to load rule for ${assistantId}:`, error);
-        return '';
-      }
-    },
+  const loadAssistantDetail = useCallback(
+    async (assistantId: string) => ipcBridge.assistants.get.invoke({ id: assistantId, locale: localeKey }),
     [localeKey]
   );
 
-  // Load assistant skill content from file
-  const loadAssistantSkills = useCallback(
-    async (assistantId: string): Promise<string> => {
-      try {
-        const content = await ipcBridge.fs.readAssistantSkill.invoke({ assistant_id: assistantId, locale: localeKey });
-        return content || '';
-      } catch (error) {
-        console.error(`Failed to load skills for ${assistantId}:`, error);
-        return '';
-      }
+  const loadEditorResources = useCallback(
+    async (assistantId: string) => {
+      const [detail, skillsList, autoSkills] = await Promise.all([
+        loadAssistantDetail(assistantId),
+        ipcBridge.fs.listAvailableSkills.invoke(),
+        ipcBridge.fs.listBuiltinAutoSkills.invoke(),
+      ]);
+      return { detail, skillsList, autoSkills };
     },
-    [localeKey]
+    [loadAssistantDetail]
   );
+
+  const resetSkillEditorState = useCallback(() => {
+    setPendingSkills([]);
+    setDeletePendingSkillName(null);
+    setDeleteCustomSkillName(null);
+    setSelectedSkills([]);
+    setCustomSkills([]);
+    setDisabledBuiltinSkills([]);
+  }, []);
 
   const handleEdit = async (assistant: AssistantListItem) => {
     setIsCreating(false);
     setActiveAssistantId(assistant.id);
+    setEditVisible(true);
+    setPromptViewMode(assistant.source === 'extension' ? 'preview' : 'edit');
     setEditName(assistant.name || '');
     setEditDescription(assistant.description || '');
     setEditAvatar(assistant.avatar || '');
     setEditAgent(assistant.preset_agent_type || 'claude');
-    setPendingSkills([]);
-    setDeletePendingSkillName(null);
-    setDeleteCustomSkillName(null);
-    setEditVisible(true);
+    resetSkillEditorState();
 
-    // Load builtin auto skills for all assistants
     try {
-      const autoSkills = await ipcBridge.fs.listBuiltinAutoSkills.invoke();
-      setBuiltinAutoSkills(autoSkills);
-    } catch {
-      setBuiltinAutoSkills([]);
-    }
-
-    // Extension assistants show extension context directly, not local rule files
-    if (assistant.source === 'extension') {
-      setPromptViewMode('preview');
-      setEditContext(assistant.context || '');
-      setEditSkills('');
-      setAvailableSkills([]);
-      setSelectedSkills(assistant.enabled_skills ?? []);
-      setCustomSkills([]);
-      setDisabledBuiltinSkills(assistant.disabled_builtin_skills ?? []);
-      return;
-    }
-
-    // Load rules, skills content
-    try {
-      const [context, skills] = await Promise.all([
-        loadAssistantContext(assistant.id),
-        loadAssistantSkills(assistant.id),
-      ]);
-      setEditContext(context);
-      setEditSkills(skills);
-
-      // Always load the available skills catalog so builtin/extension panels
-      // render for every assistant type. Custom skills stay empty for builtin
-      // assistants since they cannot own user-imported skills.
-      const skillsList = await ipcBridge.fs.listAvailableSkills.invoke();
+      const { detail, skillsList, autoSkills } = await loadEditorResources(assistant.id);
+      setEditName(detail.profile.name || assistant.name || '');
+      setEditDescription(detail.profile.description || '');
+      setEditAvatar(detail.profile.avatar || '');
+      setEditAgent(detail.engine.agent_backend || assistant.preset_agent_type || 'claude');
+      setEditContext(detail.rules.content || '');
       setAvailableSkills(skillsList);
-      setSelectedSkills(assistant.enabled_skills ?? []);
-      setCustomSkills(isBuiltinAssistant(assistant) ? [] : (assistant.custom_skill_names ?? []));
-      setDisabledBuiltinSkills(assistant.disabled_builtin_skills ?? []);
+      setBuiltinAutoSkills(autoSkills);
+      setSelectedSkills(detail.capabilities.default_skill_ids ?? []);
+      setCustomSkills(isBuiltinAssistant(assistant) ? [] : (detail.capabilities.custom_skill_names ?? []));
+      setDisabledBuiltinSkills(detail.capabilities.default_disabled_builtin_skill_ids ?? []);
     } catch (error) {
-      console.error('Failed to load assistant content:', error);
+      console.error('Failed to load assistant detail:', error);
       setEditContext('');
-      setEditSkills('');
       setAvailableSkills([]);
-      setSelectedSkills([]);
+      setBuiltinAutoSkills([]);
+      resetSkillEditorState();
     }
   };
 
-  // Create assistant function
   const handleCreate = async () => {
     setIsCreating(true);
     setActiveAssistantId(null);
+    setEditVisible(true);
+    setPromptViewMode('edit');
     setEditName('');
     setEditDescription('');
     setEditContext('');
     setEditAvatar('\u{1F916}');
     setEditAgent('claude');
-    setEditSkills('');
-    setSelectedSkills([]);
-    setCustomSkills([]);
-    setDisabledBuiltinSkills([]);
-    setPromptViewMode('edit');
-    setEditVisible(true);
+    resetSkillEditorState();
 
-    // Load available skills list and builtin auto skills
     try {
       const [skillsList, autoSkills] = await Promise.all([
         ipcBridge.fs.listAvailableSkills.invoke(),
@@ -179,89 +141,92 @@ export const useAssistantEditor = ({
     }
   };
 
-  // Duplicate assistant function
   const handleDuplicate = async (assistant: AssistantListItem) => {
     setIsCreating(true);
     setActiveAssistantId(null);
+    setEditVisible(true);
+    setPromptViewMode('edit');
     setEditName(`${assistant.name_i18n?.[localeKey] || assistant.name} (Copy)`);
     setEditDescription(assistant.description_i18n?.[localeKey] || assistant.description || '');
     setEditAvatar(assistant.avatar || '\u{1F916}');
     setEditAgent(assistant.preset_agent_type || 'claude');
-    setPromptViewMode('edit');
-    setEditVisible(true);
+    resetSkillEditorState();
 
-    // Load original assistant's rules and skills
     try {
-      const isExt = assistant.source === 'extension';
-      const [skillsList, autoSkills, context, skills] = isExt
-        ? await Promise.all([
-            ipcBridge.fs.listAvailableSkills.invoke(),
-            ipcBridge.fs.listBuiltinAutoSkills.invoke(),
-            Promise.resolve(assistant.context || ''),
-            Promise.resolve(''),
-          ])
-        : await Promise.all([
-            ipcBridge.fs.listAvailableSkills.invoke(),
-            ipcBridge.fs.listBuiltinAutoSkills.invoke(),
-            loadAssistantContext(assistant.id),
-            loadAssistantSkills(assistant.id),
-          ]);
-
-      setEditContext(context);
-      setEditSkills(skills);
+      const { detail, skillsList, autoSkills } = await loadEditorResources(assistant.id);
+      setEditContext(detail.rules.content || '');
       setAvailableSkills(skillsList);
       setBuiltinAutoSkills(autoSkills);
-      setSelectedSkills(assistant.enabled_skills ?? []);
-      setCustomSkills(assistant.custom_skill_names ?? []);
-      setDisabledBuiltinSkills(assistant.disabled_builtin_skills ?? []);
+      setSelectedSkills(detail.capabilities.default_skill_ids ?? []);
+      setCustomSkills(detail.capabilities.custom_skill_names ?? []);
+      setDisabledBuiltinSkills(detail.capabilities.default_disabled_builtin_skill_ids ?? []);
     } catch (error) {
       console.error('Failed to load assistant content for duplication:', error);
       setEditContext('');
-      setEditSkills('');
       setAvailableSkills([]);
       setBuiltinAutoSkills([]);
-      setSelectedSkills([]);
-      setCustomSkills([]);
-      setDisabledBuiltinSkills([]);
+      resetSkillEditorState();
     }
   };
 
+  const persistAssistantRules = useCallback(
+    async (assistantId: string, rules: string) => {
+      const trimmedRules = rules.trim();
+      if (trimmedRules) {
+        await ipcBridge.fs.writeAssistantRule.invoke({
+          assistant_id: assistantId,
+          locale: localeKey,
+          content: rules,
+        });
+        return;
+      }
+
+      await ipcBridge.fs.deleteAssistantRule.invoke({ assistant_id: assistantId });
+    },
+    [localeKey]
+  );
+
   const handleSave = async () => {
     try {
-      // Validate required fields
       if (!editName.trim()) {
         message.error(t('settings.assistantNameRequired', { defaultValue: 'Assistant name is required' }));
         return;
       }
 
-      // Import pending skills (skip existing ones)
+      if (!isCreating && activeAssistant && isExtensionAssistant(activeAssistant)) {
+        message.warning(
+          t('settings.extensionAssistantReadonly', {
+            defaultValue: 'Extension assistants are read-only. You can duplicate it and edit the copy.',
+          })
+        );
+        return;
+      }
+
       if (pendingSkills.length > 0) {
         const skillsToImport = pendingSkills.filter(
           (pending) => !availableSkills.some((available) => available.name === pending.name)
         );
 
-        if (skillsToImport.length > 0) {
-          for (const pendingSkill of skillsToImport) {
-            try {
-              await ipcBridge.fs.importSkillWithSymlink.invoke({ skill_path: pendingSkill.path });
-            } catch (error) {
-              console.error(`Failed to import skill "${pendingSkill.name}":`, error);
-              message.error(`Failed to import skill "${pendingSkill.name}"`);
-              return;
-            }
+        for (const pendingSkill of skillsToImport) {
+          try {
+            await ipcBridge.fs.importSkillWithSymlink.invoke({ skill_path: pendingSkill.path });
+          } catch (error) {
+            console.error(`Failed to import skill "${pendingSkill.name}":`, error);
+            message.error(t('settings.skillsHub.importError', { defaultValue: 'Error importing skill' }));
+            return;
           }
-          // Reload skills list after successful import
+        }
+
+        if (skillsToImport.length > 0) {
           const skillsList = await ipcBridge.fs.listAvailableSkills.invoke();
           setAvailableSkills(skillsList);
         }
       }
 
-      // Calculate final customSkills: merge existing + pending
-      const pendingSkillNames = pendingSkills.map((s) => s.name);
+      const pendingSkillNames = pendingSkills.map((skill) => skill.name);
       const finalCustomSkills = Array.from(new Set([...customSkills, ...pendingSkillNames]));
 
       if (isCreating) {
-        // Create new assistant via backend
         const createRequest: CreateAssistantRequest = {
           name: editName,
           description: editDescription || undefined,
@@ -272,26 +237,14 @@ export const useAssistantEditor = ({
           disabled_builtin_skills: disabledBuiltinSkills.length > 0 ? disabledBuiltinSkills : undefined,
         };
         const created = await ipcBridge.assistants.create.invoke(createRequest);
-
-        // Save rule file
-        if (editContext.trim()) {
-          await ipcBridge.fs.writeAssistantRule.invoke({
-            assistant_id: created.id,
-            locale: localeKey,
-            content: editContext,
-          });
-        }
+        await persistAssistantRules(created.id, editContext);
 
         setActiveAssistantId(created.id);
         await loadAssistants();
         message.success(t('common.createSuccess', { defaultValue: 'Created successfully' }));
       } else {
-        // Update existing assistant via backend
         if (!activeAssistant) return;
 
-        // Built-in assistants are immutable at their source; the only editable
-        // field is `preset_agent_type`, which the backend stores on the
-        // override row. Sending other fields would 403 the whole request.
         const updateRequest: UpdateAssistantRequest = isBuiltinAssistant(activeAssistant)
           ? { id: activeAssistant.id, preset_agent_type: editAgent }
           : {
@@ -306,14 +259,8 @@ export const useAssistantEditor = ({
             };
         await ipcBridge.assistants.update.invoke(updateRequest);
 
-        // Save rule file (if changed) — user assistants only; built-in rule
-        // files are read-only on the backend.
-        if (!isBuiltinAssistant(activeAssistant) && editContext.trim()) {
-          await ipcBridge.fs.writeAssistantRule.invoke({
-            assistant_id: activeAssistant.id,
-            locale: localeKey,
-            content: editContext,
-          });
+        if (!isBuiltinAssistant(activeAssistant)) {
+          await persistAssistantRules(activeAssistant.id, editContext);
         }
 
         await loadAssistants();
@@ -331,12 +278,12 @@ export const useAssistantEditor = ({
 
   const handleDeleteClick = () => {
     if (!activeAssistant) return;
-    // Cannot delete builtin assistants
+
     if (isBuiltinAssistant(activeAssistant)) {
       message.warning(t('settings.cannotDeleteBuiltin', { defaultValue: 'Cannot delete builtin assistants' }));
       return;
     }
-    // Extension assistants are read-only
+
     if (isExtensionAssistant(activeAssistant)) {
       message.warning(
         t('settings.extensionAssistantReadonly', {
@@ -345,19 +292,15 @@ export const useAssistantEditor = ({
       );
       return;
     }
+
     setDeleteConfirmVisible(true);
   };
 
   const handleDeleteConfirm = async () => {
     if (!activeAssistant) return;
-    try {
-      // Delete via backend (clears assistant row + associated override).
-      // Backend also removes rule/skill md files when classify returns user
-      // (see backend spec §5.4), so explicit fs.deleteAssistant* calls aren't
-      // required.
-      await ipcBridge.assistants.delete.invoke({ id: activeAssistant.id });
 
-      // Reload assistant list
+    try {
+      await ipcBridge.assistants.delete.invoke({ id: activeAssistant.id });
       await loadAssistants();
       setDeleteConfirmVisible(false);
       setEditVisible(false);
@@ -369,7 +312,6 @@ export const useAssistantEditor = ({
     }
   };
 
-  // Toggle assistant enabled state via override (works for all sources except extension)
   const handleToggleEnabled = async (assistant: AssistantListItem, enabled: boolean) => {
     if (isExtensionAssistant(assistant)) {
       message.warning(
@@ -391,7 +333,6 @@ export const useAssistantEditor = ({
   };
 
   return {
-    // Edit drawer state
     editVisible,
     setEditVisible,
     editName,
@@ -404,15 +345,11 @@ export const useAssistantEditor = ({
     setEditAvatar,
     editAgent,
     setEditAgent,
-    editSkills,
-    setEditSkills,
     isCreating,
     deleteConfirmVisible,
     setDeleteConfirmVisible,
     promptViewMode,
     setPromptViewMode,
-
-    // Skills editing state
     availableSkills,
     setAvailableSkills,
     customSkills,
@@ -425,15 +362,9 @@ export const useAssistantEditor = ({
     setDeletePendingSkillName,
     deleteCustomSkillName,
     setDeleteCustomSkillName,
-
-    // Builtin auto-injected skills state
     builtinAutoSkills,
     disabledBuiltinSkills,
     setDisabledBuiltinSkills,
-
-    // Handlers
-    loadAssistantContext,
-    loadAssistantSkills,
     handleEdit,
     handleCreate,
     handleDuplicate,
