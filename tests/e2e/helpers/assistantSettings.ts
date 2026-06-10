@@ -74,7 +74,15 @@ export async function duplicateAssistant(page: Page, assistant_id: string): Prom
 /** Toggle the enabled/disabled switch for an assistant. */
 export async function toggleAssistantEnabled(page: Page, assistant_id: string): Promise<void> {
   const sw = page.locator(`[data-testid="switch-enabled-${assistant_id}"]`);
+  const checkedBefore = await sw.getAttribute('aria-checked').catch(() => null);
   await sw.click();
+  if (checkedBefore !== null) {
+    await expect
+      .poll(async () => sw.getAttribute('aria-checked').catch(() => null), {
+        timeout: 5_000,
+      })
+      .not.toBe(checkedBefore);
+  }
 }
 
 // ── Search & Filter ─────────────────────────────────────────────────────────
@@ -154,22 +162,26 @@ export async function waitForAssistantEditorClose(page: Page): Promise<void> {
   await expect(page.locator(ASSISTANT_EDITOR)).not.toBeVisible({ timeout: 5_000 });
 }
 
-/** Force-close the editor via full-page controls or drawer dismissal. */
+/** Force-close the editor via full-page controls or legacy drawer dismissal. */
 export async function closeAssistantEditor(page: Page): Promise<void> {
   const editor = page.locator(ASSISTANT_EDITOR);
   if (!(await editor.isVisible().catch(() => false))) return;
 
   const backButton = page.locator('[data-testid="btn-back-assistant-editor"]');
   if (await backButton.isVisible().catch(() => false)) {
-    await backButton.click();
-    await editor.waitFor({ state: 'hidden', timeout: 5_000 }).catch(() => {});
+    await Promise.all([
+      editor.waitFor({ state: 'hidden', timeout: 5_000 }).catch(() => {}),
+      backButton.click({ force: true }).catch(() => {}),
+    ]);
     return;
   }
 
   const cancelButton = page.locator('[data-testid="btn-cancel-assistant-editor"]');
   if (await cancelButton.isVisible().catch(() => false)) {
-    await cancelButton.click();
-    await editor.waitFor({ state: 'hidden', timeout: 5_000 }).catch(() => {});
+    await Promise.all([
+      editor.waitFor({ state: 'hidden', timeout: 5_000 }).catch(() => {}),
+      cancelButton.click({ force: true }).catch(() => {}),
+    ]);
     return;
   }
 

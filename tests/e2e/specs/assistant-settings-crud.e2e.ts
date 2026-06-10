@@ -157,12 +157,12 @@ test.describe('Assistant Settings CRUD', () => {
     await fillAssistantName(page, '');
     await saveAssistant(page);
 
-    // Drawer should still be open (validation prevents close)
-    const drawerVisible = await isAssistantEditorVisible(page);
-    expect(drawerVisible).toBeTruthy();
+    // Editor should still be open (validation prevents close)
+    const editorVisible = await isAssistantEditorVisible(page);
+    expect(editorVisible).toBeTruthy();
 
-    // Close drawer without saving
-    await page.keyboard.press('Escape');
+    // Close the editor without saving so the next test starts cleanly
+    await closeAssistantEditor(page);
   });
 
   test('edit custom assistant — change name', async ({ page }) => {
@@ -246,7 +246,7 @@ test.describe('Assistant Settings CRUD', () => {
       if (optionVisible) {
         await option.click();
         await saveAssistant(page);
-        // Edit save does not auto-close the drawer — close it
+        // Edit save keeps the editor open — close it before the assertion
         await closeAssistantEditor(page);
 
         // Reopen and verify agent changed
@@ -256,7 +256,7 @@ test.describe('Assistant Settings CRUD', () => {
       }
     }
 
-    // Cleanup — ensure drawer is fully closed before clicking the card
+    // Cleanup — ensure the editor is fully closed before clicking the card
     await closeAssistantEditor(page);
     await openAssistantEditor(page, targetId);
     await deleteAssistant(page);
@@ -375,16 +375,31 @@ test.describe('Assistant Settings CRUD', () => {
   });
 
   test('disabled builtin assistant removed from guid page presets', async ({ page }) => {
+    const fetchAssistantCatalog = async () =>
+      page.evaluate(async () => {
+        const port = window.__backendPort;
+        const response = await fetch(`http://127.0.0.1:${port}/api/assistants`);
+        const payload = (await response.json()) as {
+          data?: Array<{ id: string; enabled?: boolean; source?: string }>;
+        };
+        return payload.data ?? [];
+      });
+
     await goToAssistantSettings(page);
     await page.locator('[data-testid^="assistant-card-"]').first().waitFor({ state: 'visible', timeout: 15_000 });
 
-    // Find a builtin assistant that has an enabled switch
+    // Find an enabled builtin assistant that is currently visible in settings.
     const ids = await getVisibleAssistantIds(page);
+    const builtinCandidateIds = new Set(
+      (await fetchAssistantCatalog())
+        .filter((assistant) => assistant.source === 'builtin' && assistant.enabled !== false)
+        .map((assistant) => assistant.id)
+    );
     let builtinId = '';
     for (const id of ids) {
+      if (!builtinCandidateIds.has(id)) continue;
       const sw = page.locator(`[data-testid="switch-enabled-${id}"]`);
       if (await sw.isVisible().catch(() => false)) {
-        // Check if the switch is currently "on" (checked)
         const isChecked = await sw.locator('.arco-switch-checked, .arco-switch[aria-checked="true"]').count();
         if (isChecked > 0 || (await sw.getAttribute('aria-checked')) === 'true') {
           builtinId = id;
@@ -415,16 +430,20 @@ test.describe('Assistant Settings CRUD', () => {
     await goToAssistantSettings(page);
     await page.locator('[data-testid^="assistant-card-"]').first().waitFor({ state: 'visible', timeout: 15_000 });
     await toggleAssistantEnabled(page, builtinId);
-    await page.waitForTimeout(500);
 
     // Go to guid and verify it's gone
     await goToGuid(page);
     await page.locator('[data-agent-pill="true"]').first().waitFor({ state: 'visible', timeout: 8_000 });
-    const presetAfter = await page
-      .locator(`[data-testid="preset-pill-${builtinId}"]`)
-      .isVisible()
-      .catch(() => false);
-    expect(presetAfter).toBeFalsy();
+    await expect
+      .poll(
+        async () =>
+          page
+            .locator(`[data-testid="preset-pill-${builtinId}"]`)
+            .isVisible()
+            .catch(() => false),
+        { timeout: 10_000 }
+      )
+      .toBeFalsy();
 
     // Re-enable to restore state
     await goToAssistantSettings(page);

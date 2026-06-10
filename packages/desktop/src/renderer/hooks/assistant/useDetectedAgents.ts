@@ -11,7 +11,7 @@ export type AvailableBackend = {
 };
 
 /**
- * Provides detected execution engines for backend selectors (e.g. AssistantEditDrawer).
+ * Provides detected execution engines for assistant editor backend selectors.
  * Excludes preset assistants — those live in the backend catalog
  * (`ipcBridge.assistants.list`).
  *

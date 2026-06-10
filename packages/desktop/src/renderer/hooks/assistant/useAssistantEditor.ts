@@ -10,6 +10,7 @@ import type {
 } from '@/renderer/pages/settings/AssistantSettings/types';
 import { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { mutate as swrMutate } from 'swr';
 
 type UseAssistantEditorParams = {
   localeKey: string;
@@ -71,6 +72,10 @@ export const useAssistantEditor = ({
     async (assistantId: string) => ipcBridge.assistants.get.invoke({ id: assistantId, locale: localeKey }),
     [localeKey]
   );
+
+  const refreshAssistantCatalog = useCallback(async () => {
+    await Promise.all([loadAssistants(), swrMutate('assistants.list')]);
+  }, [loadAssistants]);
 
   const loadEditorResources = useCallback(
     async (assistantId: string) => {
@@ -323,7 +328,7 @@ export const useAssistantEditor = ({
         await persistAssistantRules(created.id, editContext);
 
         setActiveAssistantId(created.id);
-        await loadAssistants();
+        await refreshAssistantCatalog();
         message.success(t('common.createSuccess', { defaultValue: 'Created successfully' }));
       } else {
         if (!activeAssistant) return;
@@ -348,7 +353,7 @@ export const useAssistantEditor = ({
           await persistAssistantRules(activeAssistant.id, editContext);
         }
 
-        await loadAssistants();
+        await refreshAssistantCatalog();
         message.success(t('common.saveSuccess', { defaultValue: 'Saved successfully' }));
       }
 
@@ -386,7 +391,7 @@ export const useAssistantEditor = ({
 
     try {
       await ipcBridge.assistants.delete.invoke({ id: activeAssistant.id });
-      await loadAssistants();
+      await refreshAssistantCatalog();
       setDeleteConfirmVisible(false);
       setEditVisible(false);
       message.success(t('common.success', { defaultValue: 'Success' }));
@@ -408,11 +413,20 @@ export const useAssistantEditor = ({
     }
 
     try {
+      await swrMutate(
+        'assistants.list',
+        (previousAssistants: Assistant[] | undefined) =>
+          previousAssistants?.map((existingAssistant) =>
+            existingAssistant.id === assistant.id ? { ...existingAssistant, enabled } : existingAssistant
+          ),
+        { revalidate: false }
+      );
       await ipcBridge.assistants.setState.invoke({ id: assistant.id, enabled });
-      await loadAssistants();
+      await refreshAssistantCatalog();
       await refreshAgentDetection();
     } catch (error) {
       console.error('Failed to toggle assistant:', error);
+      await swrMutate('assistants.list');
       message.error(t('common.failed', { defaultValue: 'Failed' }));
     }
   };

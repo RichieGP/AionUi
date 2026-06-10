@@ -42,9 +42,14 @@ vi.mock('react-i18next', () => ({
   }),
 }));
 
+vi.mock('swr', () => ({
+  mutate: vi.fn(),
+}));
+
 import { useAssistantEditor } from '@/renderer/hooks/assistant/useAssistantEditor';
 import { ipcBridge } from '@/common';
 import type { AssistantListItem } from '@/renderer/pages/settings/AssistantSettings/types';
+import { mutate as swrMutate } from 'swr';
 
 describe('useAssistantEditor', () => {
   const mockAssistantDetail = {
@@ -225,6 +230,7 @@ describe('useAssistantEditor', () => {
     expect(mockMessage.success).toHaveBeenCalled();
     expect(loadAssistantsMock).toHaveBeenCalled();
     expect(setActiveAssistantIdMock).toHaveBeenCalledWith('new-id');
+    expect(swrMutate).toHaveBeenCalledWith('assistants.list');
     expect(result.current.editVisible).toBe(false);
   });
 
@@ -264,6 +270,64 @@ describe('useAssistantEditor', () => {
     await waitFor(() => expect(ipcBridge.assistants.update.invoke).toHaveBeenCalled());
     expect(mockMessage.success).toHaveBeenCalled();
     expect(loadAssistantsMock).toHaveBeenCalled();
+    expect(swrMutate).toHaveBeenCalledWith('assistants.list');
+  });
+
+  it('optimistically updates and revalidates the shared assistant list when toggling enabled', async () => {
+    const assistant: AssistantListItem = {
+      id: 'builtin-1',
+      name: 'Builtin',
+      sort_order: 1,
+      source: 'builtin',
+      enabled: true,
+    };
+    (ipcBridge.assistants.setState.invoke as any).mockResolvedValue(undefined);
+
+    const loadAssistantsMock = vi.fn();
+    const refreshAgentDetectionMock = vi.fn();
+
+    const { result } = renderHook(() =>
+      useAssistantEditor({
+        ...defaultParams,
+        loadAssistants: loadAssistantsMock,
+        refreshAgentDetection: refreshAgentDetectionMock,
+      })
+    );
+
+    await act(async () => {
+      await result.current.handleToggleEnabled(assistant, false);
+    });
+
+    expect(swrMutate).toHaveBeenNthCalledWith(1, 'assistants.list', expect.any(Function), { revalidate: false });
+    expect(ipcBridge.assistants.setState.invoke).toHaveBeenCalledWith({ id: 'builtin-1', enabled: false });
+    expect(loadAssistantsMock).toHaveBeenCalled();
+    expect(refreshAgentDetectionMock).toHaveBeenCalled();
+    expect(swrMutate).toHaveBeenLastCalledWith('assistants.list');
+  });
+
+  it('revalidates the shared assistant list if toggle enabled fails', async () => {
+    const assistant: AssistantListItem = {
+      id: 'builtin-1',
+      name: 'Builtin',
+      sort_order: 1,
+      source: 'builtin',
+      enabled: true,
+    };
+    const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    (ipcBridge.assistants.setState.invoke as any).mockRejectedValue(new Error('toggle failed'));
+
+    const { result } = renderHook(() => useAssistantEditor(defaultParams));
+
+    await act(async () => {
+      await result.current.handleToggleEnabled(assistant, false);
+    });
+
+    expect(consoleErrorSpy).toHaveBeenCalled();
+    expect(mockMessage.error).toHaveBeenCalled();
+    expect(swrMutate).toHaveBeenNthCalledWith(1, 'assistants.list', expect.any(Function), { revalidate: false });
+    expect(swrMutate).toHaveBeenLastCalledWith('assistants.list');
+
+    consoleErrorSpy.mockRestore();
   });
 
   it('logs error when save fails', async () => {
