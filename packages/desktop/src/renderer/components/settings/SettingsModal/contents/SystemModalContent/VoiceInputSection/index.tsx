@@ -8,6 +8,7 @@ import { configService } from '@/common/config/configService';
 import type { SpeechToTextConfig } from '@/common/types/provider/speech';
 import AionSelect from '@/renderer/components/base/AionSelect';
 import { SPEECH_TO_TEXT_CONFIG_CHANGED_EVENT } from '@/renderer/services/SpeechToTextService';
+import { getModelStreamCapability } from '@/renderer/services/speech/speechStreamPolicy';
 import { Divider, Form, Input, Switch } from '@arco-design/web-react';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -216,11 +217,23 @@ const VoiceInputSection: React.FC = () => {
                 showSearch={isCustom}
                 placeholder={isCustom ? t('settings.speechToTextModelPlaceholder') : undefined}
               >
-                {buildModelOptions(modelPresets, activeModel).map((model) => (
-                  <AionSelect.Option key={model} value={model}>
-                    {model}
-                  </AionSelect.Option>
-                ))}
+                {buildModelOptions(modelPresets, activeModel).map((model) => {
+                  const capability = getModelStreamCapability(source, model);
+                  const badgeText =
+                    capability === 'supported'
+                      ? t('settings.speechToTextStreamingBadge')
+                      : capability === 'unsupported'
+                        ? t('settings.speechToTextWholeBadge')
+                        : null;
+                  return (
+                    <AionSelect.Option key={model} value={model}>
+                      {model}
+                      {badgeText !== null && (
+                        <span className='text-12px text-t-tertiary ml-8px'>{badgeText}</span>
+                      )}
+                    </AionSelect.Option>
+                  );
+                })}
               </AionSelect>
             </Form.Item>
 

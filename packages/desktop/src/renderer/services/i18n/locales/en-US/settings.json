@@ -462,6 +462,8 @@
   "speechToTextTestElapsed": "{{seconds}}s",
   "speechToTextTestMissingKey": "Enter the API key before testing",
   "speechToTextTestUploadHint": "Microphone unavailable — pick an audio file to test",
+  "speechToTextStreamingBadge": "Live",
+  "speechToTextWholeBadge": "Batch",
   "mcp": "MCP Integration",
   "imageGenerationModel": "Image Model",
   "imageGenSupportedTooltipTitle": "Currently supported image models:",

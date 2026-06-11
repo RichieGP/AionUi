@@ -462,6 +462,8 @@
   "speechToTextTestElapsed": "{{seconds}}秒",
   "speechToTextTestMissingKey": "テスト前に API キーを入力してください",
   "speechToTextTestUploadHint": "マイクが利用できません — 音声ファイルを選択してテストしてください",
+  "speechToTextStreamingBadge": "リアルタイム",
+  "speechToTextWholeBadge": "一括",
   "mcp": "MCP統合",
   "imageGenerationModel": "画像モデル",
   "imageGenSupportedTooltipTitle": "現在サポートされている画像モデル：",

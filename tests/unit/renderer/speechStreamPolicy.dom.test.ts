@@ -8,6 +8,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { SpeechToTextConfig } from '@/common/types/provider/speech';
 import {
   clearStreamMemory,
+  getModelStreamCapability,
   getStreamCapability,
   rememberStreamUnsupported,
   shouldTryStreaming,
@@ -33,6 +34,54 @@ const deepgramConfig = (model: string): SpeechToTextConfig => ({
   enabled: true,
   provider: 'deepgram',
   deepgram: { api_key: 'k', model },
+});
+
+// ---------------------------------------------------------------------------
+// 0. getModelStreamCapability
+// ---------------------------------------------------------------------------
+
+describe('getModelStreamCapability', () => {
+  describe('custom source', () => {
+    it('any model → unknown', () => {
+      expect(getModelStreamCapability('custom', 'gpt-4o-transcribe')).toBe('unknown');
+    });
+
+    it('whisper-1 with custom source → unknown (not unsupported)', () => {
+      expect(getModelStreamCapability('custom', 'whisper-1')).toBe('unknown');
+    });
+  });
+
+  describe('deepgram source', () => {
+    it('nova-3 (preset) → supported', () => {
+      expect(getModelStreamCapability('deepgram', 'nova-3')).toBe('supported');
+    });
+
+    it('nova-2 (preset) → supported', () => {
+      expect(getModelStreamCapability('deepgram', 'nova-2')).toBe('supported');
+    });
+
+    it('non-preset model → unknown', () => {
+      expect(getModelStreamCapability('deepgram', 'my-deepgram-model')).toBe('unknown');
+    });
+  });
+
+  describe('openai source (official endpoint)', () => {
+    it('whisper-1 → unsupported', () => {
+      expect(getModelStreamCapability('openai', 'whisper-1')).toBe('unsupported');
+    });
+
+    it('gpt-4o-transcribe → supported', () => {
+      expect(getModelStreamCapability('openai', 'gpt-4o-transcribe')).toBe('supported');
+    });
+
+    it('gpt-4o-mini-transcribe → supported', () => {
+      expect(getModelStreamCapability('openai', 'gpt-4o-mini-transcribe')).toBe('supported');
+    });
+
+    it('non-preset model → unknown', () => {
+      expect(getModelStreamCapability('openai', 'some-future-model')).toBe('unknown');
+    });
+  });
 });
 
 // ---------------------------------------------------------------------------

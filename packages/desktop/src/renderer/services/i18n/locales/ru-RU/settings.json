@@ -454,6 +454,8 @@
   "speechToTextTestElapsed": "{{seconds}}с",
   "speechToTextTestMissingKey": "Перед проверкой введите API-ключ",
   "speechToTextTestUploadHint": "Микрофон недоступен — выберите аудиофайл для проверки",
+  "speechToTextStreamingBadge": "В реальном времени",
+  "speechToTextWholeBadge": "Целиком",
   "mcp": "Интеграция MCP",
   "imageGenerationModel": "Модель для изображений",
   "imageGenSupportedTooltipTitle": "Поддерживаемые модели изображений:",

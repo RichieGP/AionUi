@@ -16,6 +16,47 @@ const STORAGE_KEY = 'aionui.sttStreamUnsupported';
 // ---------------------------------------------------------------------------
 
 /**
+ * Determine statically whether a given (source, model) combination can use the
+ * streaming WebSocket endpoint (`/api/stt/stream`).
+ *
+ * This is a per-option helper used for UI badges. `getStreamCapability` delegates
+ * to this function so both share the same logic.
+ *
+ * @param source - 'openai' (official endpoint), 'deepgram', or 'custom' (openai
+ *   with a non-empty base_url).
+ * @param model  - The model identifier string.
+ *
+ * Rules:
+ * - custom → always 'unknown' (custom endpoint behaviour varies; must probe)
+ * - deepgram preset model → 'supported'; non-preset → 'unknown'
+ * - openai official:
+ *   - 'whisper-1' → 'unsupported' (file-only API)
+ *   - other OPENAI preset → 'supported'
+ *   - non-preset model → 'unknown'
+ */
+export const getModelStreamCapability = (
+  source: 'openai' | 'deepgram' | 'custom',
+  model: string
+): StreamCapability => {
+  if (source === 'custom') {
+    return 'unknown';
+  }
+
+  if (source === 'deepgram') {
+    return DEEPGRAM_SPEECH_MODEL_PRESETS.includes(model) ? 'supported' : 'unknown';
+  }
+
+  // openai official endpoint
+  if (model === 'whisper-1') {
+    return 'unsupported';
+  }
+  if (OPENAI_SPEECH_MODEL_PRESETS.includes(model)) {
+    return 'supported';
+  }
+  return 'unknown';
+};
+
+/**
  * Determine statically whether the given STT config can use the streaming
  * WebSocket endpoint (`/api/stt/stream`).
  *
@@ -30,27 +71,13 @@ const STORAGE_KEY = 'aionui.sttStreamUnsupported';
  */
 export const getStreamCapability = (config: SpeechToTextConfig): StreamCapability => {
   if (config.provider === 'deepgram') {
-    const model = config.deepgram?.model ?? '';
-    return DEEPGRAM_SPEECH_MODEL_PRESETS.includes(model) ? 'supported' : 'unknown';
+    return getModelStreamCapability('deepgram', config.deepgram?.model ?? '');
   }
 
   // openai provider
-  const model = config.openai?.model ?? '';
   const baseUrl = config.openai?.base_url?.trim() ?? '';
-
-  if (baseUrl) {
-    // Custom endpoint — we can't know without probing.
-    return 'unknown';
-  }
-
-  // Official OpenAI endpoint
-  if (model === 'whisper-1') {
-    return 'unsupported';
-  }
-  if (OPENAI_SPEECH_MODEL_PRESETS.includes(model)) {
-    return 'supported';
-  }
-  return 'unknown';
+  const source = baseUrl ? 'custom' : 'openai';
+  return getModelStreamCapability(source, config.openai?.model ?? '');
 };
 
 // ---------------------------------------------------------------------------
