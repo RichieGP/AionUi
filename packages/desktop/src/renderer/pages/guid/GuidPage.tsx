@@ -5,8 +5,9 @@
  */
 
 import { ipcBridge } from '@/common';
-import type { IMcpServer } from '@/common/config/storage';
+import type { IMcpServer, TProviderWithModel } from '@/common/config/storage';
 import { resolveLocaleKey } from '@/common/utils';
+import type { Assistant, AssistantDetail } from '@/common/types/agent/assistantTypes';
 
 import { useInputFocusRing } from '@/renderer/hooks/chat/useInputFocusRing';
 import { openExternalUrl, resolveExtensionAssetUrl } from '@/renderer/utils/platform';
@@ -28,13 +29,13 @@ import { useGuidSend } from './hooks/useGuidSend';
 import { useTypewriterPlaceholder } from './hooks/useTypewriterPlaceholder';
 import { ensureBackendMcpCatalog } from '@/renderer/hooks/mcp/catalog';
 import { resolveAgentLogo } from '@/renderer/utils/model/agentLogo';
+import { resolveGuidAssistantDefaults } from './utils/assistantDefaults';
 import { Button, ConfigProvider, Dropdown, Menu, Message } from '@arco-design/web-react';
 import { Down, Left, Robot, Write } from '@icon-park/react';
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { mutate as swrMutate } from 'swr';
-import type { Assistant } from '@/common/types/agent/assistantTypes';
+import useSWR, { mutate as swrMutate } from 'swr';
 import styles from './index.module.css';
 
 const GuidPage: React.FC = () => {
@@ -193,6 +194,15 @@ const GuidPage: React.FC = () => {
     localeKey,
   });
 
+  const selectedAssistantId = agentSelection.is_presetAgent ? agentSelection.selectedAgentInfo?.custom_agent_id : null;
+  const { data: selectedAssistantDetail } = useSWR(
+    selectedAssistantId ? `guid.assistant.detail.${selectedAssistantId}.${localeKey}` : null,
+    async (): Promise<AssistantDetail | null> =>
+      ipcBridge.assistants.get
+        .invoke({ id: selectedAssistantId!, locale: localeKey })
+        .catch((_error: unknown): AssistantDetail | null => null)
+  );
+
   // --- Coordinated handlers (depend on multiple hooks) ---
   const handleInputChange = useCallback(
     (value: string) => {
@@ -340,6 +350,73 @@ const GuidPage: React.FC = () => {
     }
   }, [agentSelection.is_presetAgent, selectedAssistantRecord]);
 
+  const appliedAssistantDefaultsKeyRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!agentSelection.is_presetAgent || !selectedAssistantId || !selectedAssistantDetail) {
+      appliedAssistantDefaultsKeyRef.current = null;
+      return;
+    }
+
+    const signature = JSON.stringify({
+      assistantId: selectedAssistantId,
+      backend: agentSelection.currentEffectiveAgentInfo.agent_type,
+      defaults: selectedAssistantDetail.defaults,
+      preferences: {
+        last_model_id: selectedAssistantDetail.preferences.last_model_id,
+        last_permission_value: selectedAssistantDetail.preferences.last_permission_value,
+        last_mcp_ids: selectedAssistantDetail.preferences.last_mcp_ids,
+      },
+    });
+    if (appliedAssistantDefaultsKeyRef.current === signature) {
+      return;
+    }
+    appliedAssistantDefaultsKeyRef.current = signature;
+
+    const applyAssistantDefaults = async () => {
+      const resolvedDefaults = resolveGuidAssistantDefaults(selectedAssistantDetail);
+      const effectiveBackend = agentSelection.currentEffectiveAgentInfo.agent_type;
+
+      if (effectiveBackend === 'aionrs') {
+        if (resolvedDefaults.modelId) {
+          const matchedProvider = modelSelection.modelList.find((provider) =>
+            provider.models.includes(resolvedDefaults.modelId!)
+          );
+          if (matchedProvider) {
+            await modelSelection.setCurrentModel(
+              {
+                ...matchedProvider,
+                use_model: resolvedDefaults.modelId,
+              },
+              { persistPreference: false }
+            );
+          }
+        } else {
+          await modelSelection.resetCurrentModel({ persistPreference: false });
+        }
+      } else if (resolvedDefaults.modelId) {
+        agentSelection.setSelectedAcpModel(resolvedDefaults.modelId ?? null, { persistPreference: false });
+      }
+
+      if (resolvedDefaults.permissionMode) {
+        agentSelection.setSelectedMode(resolvedDefaults.permissionMode, { persistPreference: false });
+      }
+      setGuidSelectedMcpServerIds(resolvedDefaults.mcpIds);
+    };
+
+    void applyAssistantDefaults().catch((error) => {
+      console.error('[GuidPage] Failed to apply assistant defaults:', error);
+    });
+  }, [
+    agentSelection.currentEffectiveAgentInfo.agent_type,
+    agentSelection.setSelectedAcpModel,
+    agentSelection.setSelectedMode,
+    modelSelection.modelList,
+    modelSelection.resetCurrentModel,
+    modelSelection.setCurrentModel,
+    selectedAssistantId,
+    selectedAssistantDetail,
+  ]);
+
   const heroTitle = useMemo(() => {
     if (!agentSelection.is_presetAgent) return t('conversation.welcome.title');
     const i18nName = selectedAssistantRecord?.name_i18n?.[localeKey];
@@ -374,6 +451,24 @@ const GuidPage: React.FC = () => {
     agentSelection.selectedAgentInfo?.avatar,
     agentSelection.selectedAgentInfo?.custom_agent_id,
   ]);
+  const setGuidSelectedMode = useCallback(
+    (mode: React.SetStateAction<string>) => {
+      agentSelection.setSelectedMode(mode, { persistPreference: !agentSelection.is_presetAgent });
+    },
+    [agentSelection]
+  );
+  const setGuidSelectedAcpModel = useCallback(
+    (model: React.SetStateAction<string | null>) => {
+      agentSelection.setSelectedAcpModel(model, { persistPreference: !agentSelection.is_presetAgent });
+    },
+    [agentSelection]
+  );
+  const setGuidCurrentModel = useCallback(
+    (model: TProviderWithModel) => {
+      return modelSelection.setCurrentModel(model, { persistPreference: !agentSelection.is_presetAgent });
+    },
+    [agentSelection.is_presetAgent, modelSelection]
+  );
   const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
   const [canExpandDescription, setCanExpandDescription] = useState(false);
 
@@ -557,10 +652,10 @@ const GuidPage: React.FC = () => {
       isGeminiMode={isGeminiMode}
       modelList={modelSelection.modelList}
       current_model={modelSelection.current_model}
-      setCurrentModel={modelSelection.setCurrentModel}
+      setCurrentModel={setGuidCurrentModel}
       currentAcpCachedModelInfo={agentSelection.currentAcpCachedModelInfo}
       selectedAcpModel={agentSelection.selectedAcpModel}
-      setSelectedAcpModel={agentSelection.setSelectedAcpModel}
+      setSelectedAcpModel={setGuidSelectedAcpModel}
     />
   );
 
@@ -573,7 +668,7 @@ const GuidPage: React.FC = () => {
       selectedAgent={agentSelection.selectedAgent}
       effectiveModeAgent={agentSelection.currentEffectiveAgentInfo.agent_type}
       selectedMode={agentSelection.selectedMode}
-      onModeSelect={agentSelection.setSelectedMode}
+      onModeSelect={setGuidSelectedMode}
       is_presetAgent={agentSelection.is_presetAgent}
       selectedAgentInfo={agentSelection.selectedAgentInfo}
       assistants={agentSelection.assistants}
@@ -794,6 +889,7 @@ const GuidPage: React.FC = () => {
             is_presetAgent={agentSelection.is_presetAgent}
             selectedAgentInfo={agentSelection.selectedAgentInfo}
             assistants={agentSelection.assistants}
+            selectedAssistantDetail={selectedAssistantDetail}
             localeKey={localeKey}
             currentEffectiveAgentInfo={agentSelection.currentEffectiveAgentInfo}
             onSelectAssistant={handleSelectAssistant}

@@ -4,7 +4,6 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { ipcBridge } from '@/common';
 import { CUSTOM_AVATAR_IMAGE_MAP } from '../constants';
 import styles from '../index.module.css';
 import type { AvailableAgent, EffectiveAgentInfo } from '../types';
@@ -16,7 +15,6 @@ import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useSta
 import { resolveExtensionAssetUrl } from '@/renderer/utils/platform';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
-import useSWR from 'swr';
 
 type AssistantSelectionAreaProps = {
   is_presetAgent: boolean;
@@ -28,6 +26,7 @@ type AssistantSelectionAreaProps = {
    * those are a separate concept sourced from the AgentRegistry.
    */
   assistants: Assistant[];
+  selectedAssistantDetail?: AssistantDetail | null;
   localeKey: string;
   currentEffectiveAgentInfo: EffectiveAgentInfo;
   onSelectAssistant: (assistantId: string) => void;
@@ -48,6 +47,7 @@ const AssistantSelectionArea: React.FC<AssistantSelectionAreaProps> = ({
   selectedAgentKey,
   selectedAgentInfo,
   assistants,
+  selectedAssistantDetail,
   localeKey,
   currentEffectiveAgentInfo,
   onSelectAssistant,
@@ -58,14 +58,6 @@ const AssistantSelectionArea: React.FC<AssistantSelectionAreaProps> = ({
   const { t } = useTranslation();
   const navigate = useNavigate();
   const [agentMessage, agentMessageContext] = Message.useMessage({ maxCount: 10 });
-  const selectedAssistantId = selectedAgentInfo?.custom_agent_id ?? null;
-  const { data: selectedAssistantDetail } = useSWR(
-    is_presetAgent && selectedAssistantId ? `guid.assistant.detail.${selectedAssistantId}.${localeKey}` : null,
-    async (): Promise<AssistantDetail | null> =>
-      ipcBridge.assistants.get
-        .invoke({ id: selectedAssistantId!, locale: localeKey })
-        .catch((_error: unknown): AssistantDetail | null => null)
-  );
 
   const resolveOpenAssistantId = (): string | null => {
     if (selectedAgentInfo?.custom_agent_id) return selectedAgentInfo.custom_agent_id;
