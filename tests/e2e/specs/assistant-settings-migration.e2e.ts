@@ -241,11 +241,11 @@ test.describe('Assistant Settings Migration', () => {
     expect(detail.engine.agent_backend).toBe('aionrs');
     expect(detail.rules.content).toBe(LEGACY_RULE);
     expect(detail.prompts.recommended).toEqual([LEGACY_PROMPT]);
-    expect(detail.defaults.model.mode).toBe('unset');
-    expect(detail.defaults.permission.mode).toBe('unset');
+    expect(detail.defaults.model.mode).toBe('auto');
+    expect(detail.defaults.permission.mode).toBe('auto');
     expect(detail.defaults.skills.mode).toBe('fixed');
     expect(detail.defaults.skills.value).toEqual(['officecli-data-dashboard', 'officecli']);
-    expect(detail.defaults.mcps.mode).toBe('unset');
+    expect(detail.defaults.mcps.mode).toBe('auto');
     expect(detail.defaults.mcps.value ?? []).toEqual([]);
     expect(detail.capabilities.default_skill_ids).toEqual(['officecli-data-dashboard', 'officecli']);
     expect(detail.capabilities.default_disabled_builtin_skill_ids).toEqual(['cron']);
@@ -261,10 +261,10 @@ test.describe('Assistant Settings Migration', () => {
            AND name_i18n = '{}'
            AND description_i18n = '{}'
            AND recommended_prompts_i18n = '{}'
-           AND default_model_mode = 'unset'
-           AND default_permission_mode = 'unset'
+           AND default_model_mode = 'auto'
+           AND default_permission_mode = 'auto'
            AND default_skills_mode = 'fixed'
-           AND default_mcps_mode = 'unset'
+           AND default_mcps_mode = 'auto'
            AND rule_resource_ref = '${LEGACY_USER_ID}'`
       )
     ).toBe('1');

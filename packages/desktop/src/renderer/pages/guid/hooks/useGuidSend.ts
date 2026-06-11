@@ -150,8 +150,10 @@ export const useGuidSend = (deps: GuidSendDeps): GuidSendResult => {
       .map((server) => toSessionMcpServer(server));
 
     const finalEffectiveAgentType = effectiveAgentType;
+    const assistantOverrideModel =
+      selectedAcpModel || currentAcpCachedModelInfo?.current_model_id || current_model?.use_model || undefined;
     const assistantOverrides = {
-      model: selectedAcpModel || currentAcpCachedModelInfo?.current_model_id || current_model?.use_model || undefined,
+      model: assistantOverrideModel,
       skill_ids: enabled_skills_to_send,
       disabled_builtin_skill_ids: excludeBuiltinSkills,
     };

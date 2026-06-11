@@ -10,7 +10,11 @@ export const resolveGuidAssistantDefaults = (
   detail: AssistantDetail | null | undefined
 ): ResolvedGuidAssistantDefaults => {
   if (!detail) {
-    return { modelId: undefined, permissionMode: undefined, mcpIds: [] };
+    return {
+      modelId: undefined,
+      permissionMode: undefined,
+      mcpIds: [],
+    };
   }
 
   const modelId =

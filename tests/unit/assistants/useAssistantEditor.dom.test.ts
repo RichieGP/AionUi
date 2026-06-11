@@ -132,9 +132,9 @@ describe('useAssistantEditor', () => {
     expect(result.current.editVisible).toBe(false);
     expect(result.current.editName).toBe('');
     expect(result.current.isCreating).toBe(false);
-    expect(result.current.defaultModelMode).toBe('unset');
-    expect(result.current.defaultPermissionMode).toBe('unset');
-    expect(result.current.defaultMcpMode).toBe('unset');
+    expect(result.current.defaultModelMode).toBe('auto');
+    expect(result.current.defaultPermissionMode).toBe('auto');
+    expect(result.current.defaultMcpMode).toBe('auto');
   });
 
   it('handles handleEdit to populate form from active assistant', async () => {
@@ -183,9 +183,9 @@ describe('useAssistantEditor', () => {
     expect(result.current.editVisible).toBe(true);
     expect(result.current.editName).toBe('');
     expect(result.current.editDescription).toBe('');
-    expect(result.current.defaultModelMode).toBe('unset');
-    expect(result.current.defaultPermissionMode).toBe('unset');
-    expect(result.current.defaultMcpMode).toBe('unset');
+    expect(result.current.defaultModelMode).toBe('auto');
+    expect(result.current.defaultPermissionMode).toBe('auto');
+    expect(result.current.defaultMcpMode).toBe('auto');
   });
 
   it('calls handleSave for creating new assistant', async () => {
@@ -309,9 +309,9 @@ describe('useAssistantEditor', () => {
     });
 
     expect(result.current.editAgent).toBe('gemini');
-    expect(result.current.defaultModelMode).toBe('unset');
+    expect(result.current.defaultModelMode).toBe('auto');
     expect(result.current.defaultModelValue).toBe('');
-    expect(result.current.defaultPermissionMode).toBe('unset');
+    expect(result.current.defaultPermissionMode).toBe('auto');
     expect(result.current.defaultPermissionValue).toBe('');
   });
 
@@ -324,10 +324,10 @@ describe('useAssistantEditor', () => {
         recommended_i18n: {},
       },
       defaults: {
-        model: { mode: 'unset' as const, value: undefined },
-        permission: { mode: 'unset' as const, value: undefined },
+        model: { mode: 'auto' as const, value: undefined },
+        permission: { mode: 'auto' as const, value: undefined },
         skills: { mode: 'fixed' as const, value: ['skill-one'] },
-        mcps: { mode: 'unset' as const, value: [] },
+        mcps: { mode: 'auto' as const, value: [] },
       },
     };
     (ipcBridge.assistants.get.invoke as any).mockResolvedValue(builtinDetail);
@@ -378,15 +378,15 @@ describe('useAssistantEditor', () => {
     });
   });
 
-  it('keeps builtin unset defaults distinct from auto when loading detail', async () => {
+  it('loads builtin auto defaults when no fixed values are configured', async () => {
     const builtinDetail = {
       ...mockAssistantDetail,
       source: 'builtin',
       defaults: {
-        model: { mode: 'unset' as const, value: undefined },
-        permission: { mode: 'unset' as const, value: undefined },
+        model: { mode: 'auto' as const, value: undefined },
+        permission: { mode: 'auto' as const, value: undefined },
         skills: { mode: 'fixed' as const, value: ['skill-one'] },
-        mcps: { mode: 'unset' as const, value: [] },
+        mcps: { mode: 'auto' as const, value: [] },
       },
     };
     (ipcBridge.assistants.get.invoke as any).mockResolvedValue(builtinDetail);
@@ -411,11 +411,11 @@ describe('useAssistantEditor', () => {
       await result.current.handleEdit(assistant);
     });
 
-    expect(result.current.defaultModelMode).toBe('unset');
+    expect(result.current.defaultModelMode).toBe('auto');
     expect(result.current.defaultModelValue).toBe('');
-    expect(result.current.defaultPermissionMode).toBe('unset');
+    expect(result.current.defaultPermissionMode).toBe('auto');
     expect(result.current.defaultPermissionValue).toBe('');
-    expect(result.current.defaultMcpMode).toBe('unset');
+    expect(result.current.defaultMcpMode).toBe('auto');
     expect(result.current.selectedMcpIds).toEqual([]);
   });
 

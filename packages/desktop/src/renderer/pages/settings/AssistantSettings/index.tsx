@@ -26,6 +26,7 @@ import AssistantEditorPage from './AssistantEditorPage';
 import AssistantListPanel from './AssistantListPanel';
 import DeleteAssistantModal from './DeleteAssistantModal';
 import SkillConfirmModals from './SkillConfirmModals';
+import type { AssistantEditorViewModel } from './types';
 import React, { useCallback, useEffect, useMemo, useRef } from 'react';
 import { useLocation, useSearchParams } from 'react-router-dom';
 
@@ -77,6 +78,75 @@ const AssistantSettings: React.FC = () => {
   const editAvatarImage = editor.editAvatarPreview || resolveAvatarImageSrc(editor.editAvatar, avatarImageMap);
   const hasConsumedNavigationIntentRef = useRef(false);
   const showEditor = editor.editVisible && (editor.isCreating || activeAssistantId !== null);
+  const editorViewModel: AssistantEditorViewModel = {
+    isCreating: editor.isCreating,
+    profile: {
+      name: editor.editName,
+      setName: editor.setEditName,
+      description: editor.editDescription,
+      setDescription: editor.setEditDescription,
+      avatar: editor.editAvatar,
+      setAvatar: editor.setEditAvatar,
+      setAvatarPreview: editor.setEditAvatarPreview,
+      avatarImage: editAvatarImage,
+    },
+    agent: {
+      value: editor.editAgent,
+      setValue: editor.setEditAgent,
+      availableBackends,
+    },
+    prompts: {
+      text: editor.editRecommendedPromptsText,
+      setText: editor.setEditRecommendedPromptsText,
+    },
+    defaults: {
+      model: {
+        mode: editor.defaultModelMode,
+        setMode: editor.setDefaultModelMode,
+        value: editor.defaultModelValue,
+        setValue: editor.setDefaultModelValue,
+      },
+      permission: {
+        mode: editor.defaultPermissionMode,
+        setMode: editor.setDefaultPermissionMode,
+        value: editor.defaultPermissionValue,
+        setValue: editor.setDefaultPermissionValue,
+      },
+      skills: {
+        mode: editor.defaultSkillsMode,
+        setMode: editor.setDefaultSkillsMode,
+      },
+      mcps: {
+        mode: editor.defaultMcpMode,
+        setMode: editor.setDefaultMcpMode,
+        availableServers: editor.availableMcpServers,
+        selectedIds: editor.selectedMcpIds,
+        setSelectedIds: editor.setSelectedMcpIds,
+      },
+    },
+    rules: {
+      content: editor.editContext,
+      setContent: editor.setEditContext,
+      viewMode: editor.promptViewMode,
+      setViewMode: editor.setPromptViewMode,
+    },
+    skills: {
+      availableSkills: editor.availableSkills,
+      selectedSkills: editor.selectedSkills,
+      setSelectedSkills: editor.setSelectedSkills,
+      pendingSkills: editor.pendingSkills,
+      setDeletePendingSkillName: editor.setDeletePendingSkillName,
+      setDeleteCustomSkillName: editor.setDeleteCustomSkillName,
+      builtinAutoSkills: editor.builtinAutoSkills,
+      disabledBuiltinSkills: editor.disabledBuiltinSkills,
+      setDisabledBuiltinSkills: editor.setDisabledBuiltinSkills,
+    },
+    actions: {
+      save: editor.handleSave,
+      requestDelete: editor.handleDeleteClick,
+      duplicate: (assistant) => void editor.handleDuplicate(assistant),
+    },
+  };
 
   useEffect(() => {
     if (hasConsumedNavigationIntentRef.current) return;
@@ -119,52 +189,8 @@ const AssistantSettings: React.FC = () => {
         <div className='flex-1 min-h-0'>
           {showEditor ? (
             <AssistantEditorPage
-              isCreating={editor.isCreating}
+              editor={editorViewModel}
               activeAssistant={activeAssistant}
-              editName={editor.editName}
-              setEditName={editor.setEditName}
-              editDescription={editor.editDescription}
-              setEditDescription={editor.setEditDescription}
-              editAvatar={editor.editAvatar}
-              setEditAvatar={editor.setEditAvatar}
-              setEditAvatarPreview={editor.setEditAvatarPreview}
-              editAvatarImage={editAvatarImage}
-              editAgent={editor.editAgent}
-              setEditAgent={editor.setEditAgent}
-              editRecommendedPromptsText={editor.editRecommendedPromptsText}
-              setEditRecommendedPromptsText={editor.setEditRecommendedPromptsText}
-              defaultModelMode={editor.defaultModelMode}
-              setDefaultModelMode={editor.setDefaultModelMode}
-              defaultModelValue={editor.defaultModelValue}
-              setDefaultModelValue={editor.setDefaultModelValue}
-              defaultPermissionMode={editor.defaultPermissionMode}
-              setDefaultPermissionMode={editor.setDefaultPermissionMode}
-              defaultPermissionValue={editor.defaultPermissionValue}
-              setDefaultPermissionValue={editor.setDefaultPermissionValue}
-              defaultSkillsMode={editor.defaultSkillsMode}
-              setDefaultSkillsMode={editor.setDefaultSkillsMode}
-              defaultMcpMode={editor.defaultMcpMode}
-              setDefaultMcpMode={editor.setDefaultMcpMode}
-              availableMcpServers={editor.availableMcpServers}
-              selectedMcpIds={editor.selectedMcpIds}
-              setSelectedMcpIds={editor.setSelectedMcpIds}
-              editContext={editor.editContext}
-              setEditContext={editor.setEditContext}
-              promptViewMode={editor.promptViewMode}
-              setPromptViewMode={editor.setPromptViewMode}
-              availableSkills={editor.availableSkills}
-              selectedSkills={editor.selectedSkills}
-              setSelectedSkills={editor.setSelectedSkills}
-              pendingSkills={editor.pendingSkills}
-              setDeletePendingSkillName={editor.setDeletePendingSkillName}
-              setDeleteCustomSkillName={editor.setDeleteCustomSkillName}
-              builtinAutoSkills={editor.builtinAutoSkills}
-              disabledBuiltinSkills={editor.disabledBuiltinSkills}
-              setDisabledBuiltinSkills={editor.setDisabledBuiltinSkills}
-              availableBackends={availableBackends}
-              handleSave={editor.handleSave}
-              handleDeleteClick={editor.handleDeleteClick}
-              handleDuplicate={(assistant) => void editor.handleDuplicate(assistant)}
               onBack={() => editor.setEditVisible(false)}
             />
           ) : (

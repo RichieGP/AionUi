@@ -9,6 +9,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { ConfigProvider } from '@arco-design/web-react';
 import AssistantEditorPage from '@/renderer/pages/settings/AssistantSettings/AssistantEditorPage';
+import type { AssistantEditorViewModel } from '@/renderer/pages/settings/AssistantSettings/types';
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
@@ -21,57 +22,60 @@ vi.mock('@/renderer/pages/settings/AssistantSettings/AssistantEditorSections', (
 }));
 
 describe('AssistantEditorPage', () => {
+  const createEditor = (): AssistantEditorViewModel => ({
+    isCreating: true,
+    profile: {
+      name: '',
+      setName: vi.fn(),
+      description: '',
+      setDescription: vi.fn(),
+      avatar: '🤖',
+      setAvatar: vi.fn(),
+      setAvatarPreview: vi.fn(),
+    },
+    agent: {
+      value: 'claude',
+      setValue: vi.fn(),
+      availableBackends: [],
+    },
+    prompts: {
+      text: '',
+      setText: vi.fn(),
+    },
+    defaults: {
+      model: { mode: 'auto', setMode: vi.fn(), value: '', setValue: vi.fn() },
+      permission: { mode: 'auto', setMode: vi.fn(), value: '', setValue: vi.fn() },
+      skills: { mode: 'auto', setMode: vi.fn() },
+      mcps: { mode: 'auto', setMode: vi.fn(), availableServers: [], selectedIds: [], setSelectedIds: vi.fn() },
+    },
+    rules: {
+      content: '',
+      setContent: vi.fn(),
+      viewMode: 'preview',
+      setViewMode: vi.fn(),
+    },
+    skills: {
+      availableSkills: [],
+      selectedSkills: [],
+      setSelectedSkills: vi.fn(),
+      pendingSkills: [],
+      setDeletePendingSkillName: vi.fn(),
+      setDeleteCustomSkillName: vi.fn(),
+      builtinAutoSkills: [],
+      disabledBuiltinSkills: [],
+      setDisabledBuiltinSkills: vi.fn(),
+    },
+    actions: {
+      save: vi.fn(),
+      requestDelete: vi.fn(),
+      duplicate: vi.fn(),
+    },
+  });
+
   it('renders a single assistant-editor-page test id', () => {
     render(
       <ConfigProvider>
-        <AssistantEditorPage
-          isCreating={true}
-          activeAssistant={null}
-          editName=''
-          setEditName={vi.fn()}
-          editDescription=''
-          setEditDescription={vi.fn()}
-          editAvatar='🤖'
-          setEditAvatar={vi.fn()}
-          setEditAvatarPreview={vi.fn()}
-          editAgent='claude'
-          setEditAgent={vi.fn()}
-          editRecommendedPromptsText=''
-          setEditRecommendedPromptsText={vi.fn()}
-          defaultModelMode='auto'
-          setDefaultModelMode={vi.fn()}
-          defaultModelValue=''
-          setDefaultModelValue={vi.fn()}
-          defaultPermissionMode='auto'
-          setDefaultPermissionMode={vi.fn()}
-          defaultPermissionValue=''
-          setDefaultPermissionValue={vi.fn()}
-          defaultSkillsMode='auto'
-          setDefaultSkillsMode={vi.fn()}
-          defaultMcpMode='auto'
-          setDefaultMcpMode={vi.fn()}
-          availableMcpServers={[]}
-          selectedMcpIds={[]}
-          setSelectedMcpIds={vi.fn()}
-          editContext=''
-          setEditContext={vi.fn()}
-          promptViewMode='preview'
-          setPromptViewMode={vi.fn()}
-          availableSkills={[]}
-          selectedSkills={[]}
-          setSelectedSkills={vi.fn()}
-          pendingSkills={[]}
-          setDeletePendingSkillName={vi.fn()}
-          setDeleteCustomSkillName={vi.fn()}
-          builtinAutoSkills={[]}
-          disabledBuiltinSkills={[]}
-          setDisabledBuiltinSkills={vi.fn()}
-          availableBackends={[]}
-          handleSave={vi.fn()}
-          handleDeleteClick={vi.fn()}
-          handleDuplicate={vi.fn()}
-          onBack={vi.fn()}
-        />
+        <AssistantEditorPage editor={createEditor()} activeAssistant={null} onBack={vi.fn()} />
       </ConfigProvider>
     );
 

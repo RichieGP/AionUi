@@ -38,10 +38,10 @@ const buildDetail = (
       recommended_i18n: {},
     },
     defaults: {
-      model: { mode: 'unset' },
-      permission: { mode: 'unset' },
+      model: { mode: 'auto' },
+      permission: { mode: 'auto' },
       skills: { mode: 'fixed', value: [] },
-      mcps: { mode: 'unset', value: [] },
+      mcps: { mode: 'auto', value: [] },
       ...overrides,
     },
     capabilities: {
@@ -99,7 +99,7 @@ describe('resolveGuidAssistantDefaults', () => {
     });
   });
 
-  it('returns empty values for unset defaults', () => {
+  it('returns empty values when auto defaults have no remembered values yet', () => {
     const resolved = resolveGuidAssistantDefaults(buildDetail());
 
     expect(resolved).toEqual({

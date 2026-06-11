@@ -1,6 +1,4 @@
-import type { AssistantListItem, BuiltinAutoSkill, SkillInfo } from './types';
-import type { IMcpServer } from '@/common/config/storage';
-import type { AvailableBackend } from '@/renderer/hooks/assistant';
+import type { AssistantEditorViewModel, AssistantListItem } from './types';
 import { Button } from '@arco-design/web-react';
 import { ArrowLeft } from '@icon-park/react';
 import React from 'react';
@@ -8,105 +6,14 @@ import { useTranslation } from 'react-i18next';
 import AssistantEditorSections from './AssistantEditorSections';
 
 type AssistantEditorPageProps = {
-  isCreating: boolean;
+  editor: AssistantEditorViewModel;
   activeAssistant: AssistantListItem | null;
-  editName: string;
-  setEditName: (value: string) => void;
-  editDescription: string;
-  setEditDescription: (value: string) => void;
-  editAvatar: string;
-  setEditAvatar: (value: string) => void;
-  setEditAvatarPreview: (value: string | undefined) => void;
-  editAvatarImage?: string;
-  editAgent: string;
-  setEditAgent: (value: string) => void;
-  editRecommendedPromptsText: string;
-  setEditRecommendedPromptsText: (value: string) => void;
-  defaultModelMode: 'unset' | 'auto' | 'fixed';
-  setDefaultModelMode: (value: 'unset' | 'auto' | 'fixed') => void;
-  defaultModelValue: string;
-  setDefaultModelValue: (value: string) => void;
-  defaultPermissionMode: 'unset' | 'auto' | 'fixed';
-  setDefaultPermissionMode: (value: 'unset' | 'auto' | 'fixed') => void;
-  defaultPermissionValue: string;
-  setDefaultPermissionValue: (value: string) => void;
-  defaultSkillsMode: 'auto' | 'fixed';
-  setDefaultSkillsMode: (value: 'auto' | 'fixed') => void;
-  defaultMcpMode: 'unset' | 'auto' | 'fixed';
-  setDefaultMcpMode: (value: 'unset' | 'auto' | 'fixed') => void;
-  availableMcpServers: IMcpServer[];
-  selectedMcpIds: string[];
-  setSelectedMcpIds: (value: string[]) => void;
-  editContext: string;
-  setEditContext: (value: string) => void;
-  promptViewMode: 'edit' | 'preview';
-  setPromptViewMode: (value: 'edit' | 'preview') => void;
-  availableSkills: SkillInfo[];
-  selectedSkills: string[];
-  setSelectedSkills: (value: string[]) => void;
-  pendingSkills: Array<{ name: string; description: string }>;
-  setDeletePendingSkillName: (value: string | null) => void;
-  setDeleteCustomSkillName: (value: string | null) => void;
-  builtinAutoSkills: BuiltinAutoSkill[];
-  disabledBuiltinSkills: string[];
-  setDisabledBuiltinSkills: (value: string[]) => void;
-  availableBackends: AvailableBackend[];
-  handleSave: () => void;
-  handleDeleteClick: () => void;
-  handleDuplicate: (assistant: AssistantListItem) => void;
   onBack: () => void;
 };
 
-const AssistantEditorPage: React.FC<AssistantEditorPageProps> = ({
-  isCreating,
-  activeAssistant,
-  editName,
-  setEditName,
-  editDescription,
-  setEditDescription,
-  editAvatar,
-  setEditAvatar,
-  setEditAvatarPreview,
-  editAvatarImage,
-  editAgent,
-  setEditAgent,
-  editRecommendedPromptsText,
-  setEditRecommendedPromptsText,
-  defaultModelMode,
-  setDefaultModelMode,
-  defaultModelValue,
-  setDefaultModelValue,
-  defaultPermissionMode,
-  setDefaultPermissionMode,
-  defaultPermissionValue,
-  setDefaultPermissionValue,
-  defaultSkillsMode,
-  setDefaultSkillsMode,
-  defaultMcpMode,
-  setDefaultMcpMode,
-  availableMcpServers,
-  selectedMcpIds,
-  setSelectedMcpIds,
-  editContext,
-  setEditContext,
-  promptViewMode,
-  setPromptViewMode,
-  availableSkills,
-  selectedSkills,
-  setSelectedSkills,
-  pendingSkills,
-  setDeletePendingSkillName,
-  setDeleteCustomSkillName,
-  builtinAutoSkills,
-  disabledBuiltinSkills,
-  setDisabledBuiltinSkills,
-  availableBackends,
-  handleSave,
-  handleDeleteClick,
-  handleDuplicate,
-  onBack,
-}) => {
+const AssistantEditorPage: React.FC<AssistantEditorPageProps> = ({ editor, activeAssistant, onBack }) => {
   const { t } = useTranslation();
+  const { isCreating, actions } = editor;
 
   return (
     <div data-testid='assistant-editor-page' className='flex h-full min-h-0 flex-col overflow-hidden bg-transparent'>
@@ -137,7 +44,7 @@ const AssistantEditorPage: React.FC<AssistantEditorPageProps> = ({
               status='danger'
               className='!rounded-8px'
               style={{ backgroundColor: 'rgb(var(--danger-1))' }}
-              onClick={handleDeleteClick}
+              onClick={actions.requestDelete}
               data-testid='btn-delete-assistant'
             >
               {t('common.delete', { defaultValue: 'Delete' })}
@@ -146,7 +53,7 @@ const AssistantEditorPage: React.FC<AssistantEditorPageProps> = ({
           <Button onClick={onBack} className='!rounded-8px bg-fill-1' data-testid='btn-cancel-assistant-editor'>
             {t('common.cancel', { defaultValue: 'Cancel' })}
           </Button>
-          <Button type='primary' onClick={handleSave} data-testid='btn-save-assistant' className='!rounded-8px'>
+          <Button type='primary' onClick={actions.save} data-testid='btn-save-assistant' className='!rounded-8px'>
             {isCreating ? t('common.create', { defaultValue: 'Create' }) : t('common.save', { defaultValue: 'Save' })}
           </Button>
         </div>
@@ -154,52 +61,7 @@ const AssistantEditorPage: React.FC<AssistantEditorPageProps> = ({
 
       <div data-testid='assistant-editor-body' className='min-h-0 flex-1 overflow-auto px-18px py-18px pb-24px'>
         <div className='mx-auto w-full max-w-760px'>
-          <AssistantEditorSections
-            isCreating={isCreating}
-            editName={editName}
-            setEditName={setEditName}
-            editDescription={editDescription}
-            setEditDescription={setEditDescription}
-            editAvatar={editAvatar}
-            setEditAvatar={setEditAvatar}
-            setEditAvatarPreview={setEditAvatarPreview}
-            editAvatarImage={editAvatarImage}
-            editAgent={editAgent}
-            setEditAgent={setEditAgent}
-            editRecommendedPromptsText={editRecommendedPromptsText}
-            setEditRecommendedPromptsText={setEditRecommendedPromptsText}
-            defaultModelMode={defaultModelMode}
-            setDefaultModelMode={setDefaultModelMode}
-            defaultModelValue={defaultModelValue}
-            setDefaultModelValue={setDefaultModelValue}
-            defaultPermissionMode={defaultPermissionMode}
-            setDefaultPermissionMode={setDefaultPermissionMode}
-            defaultPermissionValue={defaultPermissionValue}
-            setDefaultPermissionValue={setDefaultPermissionValue}
-            defaultSkillsMode={defaultSkillsMode}
-            setDefaultSkillsMode={setDefaultSkillsMode}
-            defaultMcpMode={defaultMcpMode}
-            setDefaultMcpMode={setDefaultMcpMode}
-            availableMcpServers={availableMcpServers}
-            selectedMcpIds={selectedMcpIds}
-            setSelectedMcpIds={setSelectedMcpIds}
-            editContext={editContext}
-            setEditContext={setEditContext}
-            promptViewMode={promptViewMode}
-            setPromptViewMode={setPromptViewMode}
-            availableSkills={availableSkills}
-            selectedSkills={selectedSkills}
-            setSelectedSkills={setSelectedSkills}
-            pendingSkills={pendingSkills}
-            setDeletePendingSkillName={setDeletePendingSkillName}
-            setDeleteCustomSkillName={setDeleteCustomSkillName}
-            builtinAutoSkills={builtinAutoSkills}
-            disabledBuiltinSkills={disabledBuiltinSkills}
-            setDisabledBuiltinSkills={setDisabledBuiltinSkills}
-            activeAssistant={activeAssistant}
-            availableBackends={availableBackends}
-            handleDuplicate={handleDuplicate}
-          />
+          <AssistantEditorSections editor={editor} activeAssistant={activeAssistant} />
         </div>
       </div>
     </div>

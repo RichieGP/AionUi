@@ -30,7 +30,7 @@ import { useTypewriterPlaceholder } from './hooks/useTypewriterPlaceholder';
 import { ensureBackendMcpCatalog } from '@/renderer/hooks/mcp/catalog';
 import { resolveAgentLogo } from '@/renderer/utils/model/agentLogo';
 import { resolveGuidAssistantDefaults } from './utils/assistantDefaults';
-import { Button, ConfigProvider, Dropdown, Menu, Message } from '@arco-design/web-react';
+import { Button, ConfigProvider, Message } from '@arco-design/web-react';
 import { Down, Left, Robot, Write } from '@icon-park/react';
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -395,6 +395,8 @@ const GuidPage: React.FC = () => {
         }
       } else if (resolvedDefaults.modelId) {
         agentSelection.setSelectedAcpModel(resolvedDefaults.modelId ?? null, { persistPreference: false });
+      } else {
+        agentSelection.setSelectedAcpModel(null, { persistPreference: false });
       }
 
       if (resolvedDefaults.permissionMode) {
@@ -740,65 +742,6 @@ const GuidPage: React.FC = () => {
                     onClick={() => openAssistantDetailsRef.current?.()}
                     aria-label={t('settings.editAssistant', { defaultValue: 'Assistant Details' })}
                   />
-                </div>
-                <div className={styles.heroHeaderRight}>
-                  <Dropdown
-                    trigger='click'
-                    position='bl'
-                    droplist={
-                      <Menu
-                        onClickMenuItem={(key) => {
-                          handlePresetAgentTypeSwitch(String(key)).catch((err) =>
-                            console.error('Failed to switch agent type:', err)
-                          );
-                        }}
-                      >
-                        {agentSwitcherItems.map((item) => (
-                          <Menu.Item key={item.key}>
-                            <div className='flex items-center justify-between gap-12px min-w-120px'>
-                              <span className='flex items-center gap-6px'>
-                                {item.logo ? (
-                                  <img
-                                    src={item.logo}
-                                    alt=''
-                                    width={16}
-                                    height={16}
-                                    style={{ objectFit: 'contain', flexShrink: 0 }}
-                                  />
-                                ) : (
-                                  <Robot theme='outline' size={16} fill='currentColor' style={{ flexShrink: 0 }} />
-                                )}
-                                {item.label}
-                                {item.isExtension ? (
-                                  <span className='text-11px px-4px py-1px rd-4px bg-[rgb(var(--arcoblue-1))] text-[rgb(var(--arcoblue-6))]'>
-                                    ext
-                                  </span>
-                                ) : null}
-                              </span>
-                              {item.isCurrent ? <span>✓</span> : null}
-                            </div>
-                          </Menu.Item>
-                        ))}
-                      </Menu>
-                    }
-                  >
-                    <Button size='mini' type='text' className={styles.heroAgentSwitchButton}>
-                      <span className='inline-flex items-center gap-4px'>
-                        {effectiveAgentLogo ? (
-                          <img
-                            src={effectiveAgentLogo}
-                            alt=''
-                            width={20}
-                            height={20}
-                            className={styles.heroAgentSwitchIcon}
-                          />
-                        ) : (
-                          <Robot theme='outline' size={20} fill='currentColor' />
-                        )}
-                        <Down theme='outline' size={16} fill='currentColor' />
-                      </span>
-                    </Button>
-                  </Dropdown>
                 </div>
               </div>
             ) : (

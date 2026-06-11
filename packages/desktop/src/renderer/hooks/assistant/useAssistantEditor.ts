@@ -21,9 +21,9 @@ type UseAssistantEditorParams = {
   message: ReturnType<typeof Message.useMessage>[0];
 };
 
-type AssistantScalarDefaultMode = 'unset' | 'auto' | 'fixed';
+type AssistantScalarDefaultMode = 'auto' | 'fixed';
 type AssistantSkillsDefaultMode = 'auto' | 'fixed';
-type AssistantMcpDefaultMode = 'unset' | 'auto' | 'fixed';
+type AssistantMcpDefaultMode = 'auto' | 'fixed';
 
 const isBuiltinAssistant = (assistant: Assistant | null | undefined): boolean => assistant?.source === 'builtin';
 
@@ -61,12 +61,12 @@ export const useAssistantEditor = ({
   const [editAvatarPreview, setEditAvatarPreview] = useState<string | undefined>(undefined);
   const [editAgent, setEditAgentState] = useState<string>('claude');
   const [editRecommendedPromptsText, setEditRecommendedPromptsText] = useState('');
-  const [defaultModelMode, setDefaultModelMode] = useState<AssistantScalarDefaultMode>('unset');
+  const [defaultModelMode, setDefaultModelMode] = useState<AssistantScalarDefaultMode>('auto');
   const [defaultModelValue, setDefaultModelValue] = useState('');
-  const [defaultPermissionMode, setDefaultPermissionMode] = useState<AssistantScalarDefaultMode>('unset');
+  const [defaultPermissionMode, setDefaultPermissionMode] = useState<AssistantScalarDefaultMode>('auto');
   const [defaultPermissionValue, setDefaultPermissionValue] = useState('');
   const [defaultSkillsMode, setDefaultSkillsMode] = useState<AssistantSkillsDefaultMode>('fixed');
-  const [defaultMcpMode, setDefaultMcpMode] = useState<AssistantMcpDefaultMode>('unset');
+  const [defaultMcpMode, setDefaultMcpMode] = useState<AssistantMcpDefaultMode>('auto');
   const [availableMcpServers, setAvailableMcpServers] = useState<IMcpServer[]>([]);
   const [selectedMcpIds, setSelectedMcpIds] = useState<string[]>([]);
   const [isCreating, setIsCreating] = useState(false);
@@ -124,19 +124,19 @@ export const useAssistantEditor = ({
 
   const resetDefaultConfigState = useCallback(() => {
     setEditRecommendedPromptsText('');
-    setDefaultModelMode('unset');
+    setDefaultModelMode('auto');
     setDefaultModelValue('');
-    setDefaultPermissionMode('unset');
+    setDefaultPermissionMode('auto');
     setDefaultPermissionValue('');
     setDefaultSkillsMode('fixed');
-    setDefaultMcpMode('unset');
+    setDefaultMcpMode('auto');
     setSelectedMcpIds([]);
   }, []);
 
   const resetModelAndPermissionDefaults = useCallback(() => {
-    setDefaultModelMode('unset');
+    setDefaultModelMode('auto');
     setDefaultModelValue('');
-    setDefaultPermissionMode('unset');
+    setDefaultPermissionMode('auto');
     setDefaultPermissionValue('');
   }, []);
 
@@ -174,22 +174,12 @@ export const useAssistantEditor = ({
       setEditAgent(detail.engine.agent_backend || assistant.preset_agent_type || 'claude');
       setEditContext(detail.rules.content || '');
       setEditRecommendedPromptsText(resolveLocalizedRecommendedPrompts(detail, localeKey).join('\n'));
-      setDefaultModelMode(
-        detail.defaults.model.mode === 'fixed' ? 'fixed' : detail.defaults.model.mode === 'unset' ? 'unset' : 'auto'
-      );
+      setDefaultModelMode(detail.defaults.model.mode === 'fixed' ? 'fixed' : 'auto');
       setDefaultModelValue(detail.defaults.model.value || '');
-      setDefaultPermissionMode(
-        detail.defaults.permission.mode === 'fixed'
-          ? 'fixed'
-          : detail.defaults.permission.mode === 'unset'
-            ? 'unset'
-            : 'auto'
-      );
+      setDefaultPermissionMode(detail.defaults.permission.mode === 'fixed' ? 'fixed' : 'auto');
       setDefaultPermissionValue(detail.defaults.permission.value || '');
       setDefaultSkillsMode(detail.defaults.skills.mode === 'auto' ? 'auto' : 'fixed');
-      setDefaultMcpMode(
-        detail.defaults.mcps.mode === 'fixed' ? 'fixed' : detail.defaults.mcps.mode === 'unset' ? 'unset' : 'auto'
-      );
+      setDefaultMcpMode(detail.defaults.mcps.mode === 'fixed' ? 'fixed' : 'auto');
       setSelectedMcpIds(detail.defaults.mcps.value ?? []);
       setAvailableSkills(skillsList);
       setBuiltinAutoSkills(autoSkills);
@@ -256,22 +246,12 @@ export const useAssistantEditor = ({
       const { detail, skillsList, autoSkills, mcpServers } = await loadEditorResources(assistant.id);
       setEditContext(detail.rules.content || '');
       setEditRecommendedPromptsText(resolveLocalizedRecommendedPrompts(detail, localeKey).join('\n'));
-      setDefaultModelMode(
-        detail.defaults.model.mode === 'fixed' ? 'fixed' : detail.defaults.model.mode === 'unset' ? 'unset' : 'auto'
-      );
+      setDefaultModelMode(detail.defaults.model.mode === 'fixed' ? 'fixed' : 'auto');
       setDefaultModelValue(detail.defaults.model.value || '');
-      setDefaultPermissionMode(
-        detail.defaults.permission.mode === 'fixed'
-          ? 'fixed'
-          : detail.defaults.permission.mode === 'unset'
-            ? 'unset'
-            : 'auto'
-      );
+      setDefaultPermissionMode(detail.defaults.permission.mode === 'fixed' ? 'fixed' : 'auto');
       setDefaultPermissionValue(detail.defaults.permission.value || '');
       setDefaultSkillsMode(detail.defaults.skills.mode === 'auto' ? 'auto' : 'fixed');
-      setDefaultMcpMode(
-        detail.defaults.mcps.mode === 'fixed' ? 'fixed' : detail.defaults.mcps.mode === 'unset' ? 'unset' : 'auto'
-      );
+      setDefaultMcpMode(detail.defaults.mcps.mode === 'fixed' ? 'fixed' : 'auto');
       setSelectedMcpIds(detail.defaults.mcps.value ?? []);
       setAvailableSkills(skillsList);
       setBuiltinAutoSkills(autoSkills);

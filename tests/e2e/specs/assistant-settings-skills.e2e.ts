@@ -59,13 +59,12 @@ test.describe('Assistant Settings Skills / MCP', () => {
     await closeAssistantEditor(page);
   });
 
-  test('default MCP dropdown keeps unset and remember-last-used as separate entries', async ({ page }) => {
+  test('default MCP dropdown exposes remember-last-used option', async ({ page }) => {
     await goToAssistantSettings(page);
     await clickCreateAssistant(page);
     await fillAssistantName(page, `MCP Options ${Date.now()}`);
 
     await openSelect(page, 'select-assistant-default-mcp');
-    await expect(page.getByRole('button', { name: /Not configured|暂不设置/i })).toBeVisible();
     await expect(page.getByRole('button', { name: /Remember last used automatically|自动记住上次/i })).toBeVisible();
     await page.keyboard.press('Escape');
 

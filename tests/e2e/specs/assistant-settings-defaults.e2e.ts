@@ -2,9 +2,9 @@
  * Assistant Settings Defaults — E2E tests aligned with phase-1 governance.
  *
  * Covers:
- * - unset / auto / fixed semantics exposed as separate choices
- * - new assistant defaults start as "Not configured"
- * - changing main agent clears fixed model/permission back to unset
+ * - auto / fixed semantics exposed as separate choices
+ * - new assistant defaults start with remember-last-used mode
+ * - changing main agent clears fixed model/permission back to auto
  * - builtin assistant keeps model / permission editable
  */
 import { test, expect } from '../fixtures';
@@ -43,35 +43,32 @@ async function findBuiltinAssistantId(page: import('@playwright/test').Page): Pr
 test.describe('Assistant Settings Defaults', () => {
   test.setTimeout(90_000);
 
-  test('new assistant starts with Not configured for model, permission, and MCP', async ({ page }) => {
+  test('new assistant starts with Remember last used automatically for model, permission, and MCP', async ({
+    page,
+  }) => {
     await goToAssistantSettings(page);
     await clickCreateAssistant(page);
     await fillAssistantName(page, `Defaults State ${Date.now()}`);
 
     await expect(page.locator('[data-testid="select-assistant-default-model"]')).toContainText(
-      /Not configured|暂不设置/
+      /Remember last used automatically|自动记住上次/
     );
     await expect(page.locator('[data-testid="select-assistant-default-permission"]')).toContainText(
-      /Not configured|暂不设置/
+      /Remember last used automatically|自动记住上次/
     );
-    await expect(page.locator('[data-testid="select-assistant-default-mcp"]')).toContainText(/Not configured|暂不设置/);
+    await expect(page.locator('[data-testid="select-assistant-default-mcp"]')).toContainText(
+      /Remember last used automatically|自动记住上次/
+    );
 
     await closeAssistantEditor(page);
   });
 
-  test('default model and permission expose separate Not configured and Remember last used options', async ({
-    page,
-  }) => {
+  test('default model and permission expose Remember last used and fixed options', async ({ page }) => {
     await goToAssistantSettings(page);
     await clickCreateAssistant(page);
     await fillAssistantName(page, `Defaults Options ${Date.now()}`);
 
     await openSelect(page, 'select-assistant-default-model');
-    await expect(
-      selectOptions(page)
-        .filter({ hasText: /Not configured|暂不设置/i })
-        .first()
-    ).toBeVisible();
     await expect(
       selectOptions(page)
         .filter({ hasText: /Remember last used automatically|自动记住上次/i })
@@ -82,11 +79,6 @@ test.describe('Assistant Settings Defaults', () => {
     await openSelect(page, 'select-assistant-default-permission');
     await expect(
       selectOptions(page)
-        .filter({ hasText: /Not configured|暂不设置/i })
-        .first()
-    ).toBeVisible();
-    await expect(
-      selectOptions(page)
         .filter({ hasText: /Remember last used automatically|自动记住上次/i })
         .first()
     ).toBeVisible();
@@ -95,7 +87,9 @@ test.describe('Assistant Settings Defaults', () => {
     await closeAssistantEditor(page);
   });
 
-  test('changing main agent clears fixed model and permission back to Not configured', async ({ page }) => {
+  test('changing main agent clears fixed model and permission back to Remember last used automatically', async ({
+    page,
+  }) => {
     await goToAssistantSettings(page);
     await clickCreateAssistant(page);
     await fillAssistantName(page, `Agent Reset ${Date.now()}`);
@@ -112,7 +106,7 @@ test.describe('Assistant Settings Defaults', () => {
     }
     await modelOptions.nth(2).click();
     await expect(page.locator('[data-testid="select-assistant-default-model"]')).not.toContainText(
-      /Not configured|暂不设置/
+      /Remember last used automatically|自动记住上次/
     );
 
     await openSelect(page, 'select-assistant-default-permission');
@@ -124,7 +118,7 @@ test.describe('Assistant Settings Defaults', () => {
     }
     await permissionOptions.nth(2).click();
     await expect(page.locator('[data-testid="select-assistant-default-permission"]')).not.toContainText(
-      /Not configured|暂不设置/
+      /Remember last used automatically|自动记住上次/
     );
 
     await openSelect(page, 'select-assistant-agent');
@@ -147,10 +141,10 @@ test.describe('Assistant Settings Defaults', () => {
     }
 
     await expect(page.locator('[data-testid="select-assistant-default-model"]')).toContainText(
-      /Not configured|暂不设置/
+      /Remember last used automatically|自动记住上次/
     );
     await expect(page.locator('[data-testid="select-assistant-default-permission"]')).toContainText(
-      /Not configured|暂不设置/
+      /Remember last used automatically|自动记住上次/
     );
 
     await closeAssistantEditor(page);

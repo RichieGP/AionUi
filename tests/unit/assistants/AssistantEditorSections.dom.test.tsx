@@ -4,6 +4,7 @@ import { ConfigProvider } from '@arco-design/web-react';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import AssistantEditorSections from '@/renderer/pages/settings/AssistantSettings/AssistantEditorSections';
+import type { AssistantEditorViewModel } from '@/renderer/pages/settings/AssistantSettings/types';
 
 const mockUseModelProviderList = vi.fn(() => ({
   providers: [],
@@ -55,6 +56,77 @@ const renderWithProviders = (ui: React.ReactElement) =>
     </MemoryRouter>
   );
 
+const createEditor = (overrides: Partial<AssistantEditorViewModel> = {}): AssistantEditorViewModel => {
+  const base: AssistantEditorViewModel = {
+    isCreating: true,
+    profile: {
+      name: 'Writer',
+      setName: vi.fn(),
+      description: 'desc',
+      setDescription: vi.fn(),
+      avatar: '✍️',
+      setAvatar: vi.fn(),
+      setAvatarPreview: vi.fn(),
+    },
+    agent: {
+      value: 'claude',
+      setValue: vi.fn(),
+      availableBackends: [],
+    },
+    prompts: {
+      text: '',
+      setText: vi.fn(),
+    },
+    defaults: {
+      model: { mode: 'auto', setMode: vi.fn(), value: '', setValue: vi.fn() },
+      permission: { mode: 'auto', setMode: vi.fn(), value: '', setValue: vi.fn() },
+      skills: { mode: 'fixed', setMode: vi.fn() },
+      mcps: { mode: 'fixed', setMode: vi.fn(), availableServers: [], selectedIds: [], setSelectedIds: vi.fn() },
+    },
+    rules: {
+      content: 'rules',
+      setContent: vi.fn(),
+      viewMode: 'preview',
+      setViewMode: vi.fn(),
+    },
+    skills: {
+      availableSkills: [],
+      selectedSkills: [],
+      setSelectedSkills: vi.fn(),
+      pendingSkills: [],
+      setDeletePendingSkillName: vi.fn(),
+      setDeleteCustomSkillName: vi.fn(),
+      builtinAutoSkills: [],
+      disabledBuiltinSkills: [],
+      setDisabledBuiltinSkills: vi.fn(),
+    },
+    actions: {
+      save: vi.fn(),
+      requestDelete: vi.fn(),
+      duplicate: vi.fn(),
+    },
+  };
+
+  return {
+    ...base,
+    ...overrides,
+    profile: { ...base.profile, ...overrides.profile },
+    agent: { ...base.agent, ...overrides.agent },
+    prompts: { ...base.prompts, ...overrides.prompts },
+    defaults: {
+      ...base.defaults,
+      ...overrides.defaults,
+      model: { ...base.defaults.model, ...overrides.defaults?.model },
+      permission: { ...base.defaults.permission, ...overrides.defaults?.permission },
+      skills: { ...base.defaults.skills, ...overrides.defaults?.skills },
+      mcps: { ...base.defaults.mcps, ...overrides.defaults?.mcps },
+    },
+    rules: { ...base.rules, ...overrides.rules },
+    skills: { ...base.skills, ...overrides.skills },
+    actions: { ...base.actions, ...overrides.actions },
+  };
+};
+
 describe('AssistantEditorSections', () => {
   beforeEach(() => {
     showOpenInvokeMock.mockReset();
@@ -69,51 +141,32 @@ describe('AssistantEditorSections', () => {
   it('renders all default configuration rows in a single card', () => {
     renderWithProviders(
       <AssistantEditorSections
-        isCreating={true}
-        editName='Writer'
-        setEditName={vi.fn()}
-        editDescription='desc'
-        setEditDescription={vi.fn()}
-        editAvatar='✍️'
-        setEditAvatar={vi.fn()}
-        setEditAvatarPreview={vi.fn()}
-        editAgent='claude'
-        setEditAgent={vi.fn()}
-        editRecommendedPromptsText={'Prompt one\nPrompt two'}
-        setEditRecommendedPromptsText={vi.fn()}
-        defaultModelMode='auto'
-        setDefaultModelMode={vi.fn()}
-        defaultModelValue=''
-        setDefaultModelValue={vi.fn()}
-        defaultPermissionMode='auto'
-        setDefaultPermissionMode={vi.fn()}
-        defaultPermissionValue=''
-        setDefaultPermissionValue={vi.fn()}
-        defaultSkillsMode='fixed'
-        setDefaultSkillsMode={vi.fn()}
-        defaultMcpMode='fixed'
-        setDefaultMcpMode={vi.fn()}
-        availableMcpServers={[]}
-        selectedMcpIds={['filesystem']}
-        setSelectedMcpIds={vi.fn()}
-        editContext='rules'
-        setEditContext={vi.fn()}
-        promptViewMode='preview'
-        setPromptViewMode={vi.fn()}
-        availableSkills={[
-          { name: 'browse', description: 'Browse the web', location: '', is_custom: false, source: 'builtin' },
-        ]}
-        selectedSkills={['browse']}
-        setSelectedSkills={vi.fn()}
-        pendingSkills={[]}
-        setDeletePendingSkillName={vi.fn()}
-        setDeleteCustomSkillName={vi.fn()}
-        builtinAutoSkills={[]}
-        disabledBuiltinSkills={[]}
-        setDisabledBuiltinSkills={vi.fn()}
+        editor={createEditor({
+          prompts: { text: 'Prompt one\nPrompt two', setText: vi.fn() },
+          defaults: {
+            mcps: {
+              mode: 'fixed',
+              setMode: vi.fn(),
+              availableServers: [],
+              selectedIds: ['filesystem'],
+              setSelectedIds: vi.fn(),
+            },
+          },
+          skills: {
+            availableSkills: [
+              { name: 'browse', description: 'Browse the web', location: '', is_custom: false, source: 'builtin' },
+            ],
+            selectedSkills: ['browse'],
+            setSelectedSkills: vi.fn(),
+            pendingSkills: [],
+            setDeletePendingSkillName: vi.fn(),
+            setDeleteCustomSkillName: vi.fn(),
+            builtinAutoSkills: [],
+            disabledBuiltinSkills: [],
+            setDisabledBuiltinSkills: vi.fn(),
+          },
+        })}
         activeAssistant={null}
-        availableBackends={[]}
-        handleDuplicate={vi.fn()}
       />
     );
 
@@ -125,7 +178,7 @@ describe('AssistantEditorSections', () => {
     expect(defaultsScope.getByText('Default MCP')).toBeInTheDocument();
     expect(
       defaultsScope.getByText(
-        'Not configured applies no assistant-level default. Remember last used only takes effect after this assistant has recorded a previous selection.'
+        'Remember last used only takes effect after this assistant has recorded a previous selection.'
       )
     ).toBeInTheDocument();
   });
@@ -133,49 +186,8 @@ describe('AssistantEditorSections', () => {
   it('renders recommended prompts as a list with actions', () => {
     renderWithProviders(
       <AssistantEditorSections
-        isCreating={true}
-        editName='Writer'
-        setEditName={vi.fn()}
-        editDescription='desc'
-        setEditDescription={vi.fn()}
-        editAvatar='✍️'
-        setEditAvatar={vi.fn()}
-        setEditAvatarPreview={vi.fn()}
-        editAgent='claude'
-        setEditAgent={vi.fn()}
-        editRecommendedPromptsText={'Prompt one\nPrompt two'}
-        setEditRecommendedPromptsText={vi.fn()}
-        defaultModelMode='auto'
-        setDefaultModelMode={vi.fn()}
-        defaultModelValue=''
-        setDefaultModelValue={vi.fn()}
-        defaultPermissionMode='auto'
-        setDefaultPermissionMode={vi.fn()}
-        defaultPermissionValue=''
-        setDefaultPermissionValue={vi.fn()}
-        defaultSkillsMode='fixed'
-        setDefaultSkillsMode={vi.fn()}
-        defaultMcpMode='fixed'
-        setDefaultMcpMode={vi.fn()}
-        availableMcpServers={[]}
-        selectedMcpIds={[]}
-        setSelectedMcpIds={vi.fn()}
-        editContext='rules'
-        setEditContext={vi.fn()}
-        promptViewMode='preview'
-        setPromptViewMode={vi.fn()}
-        availableSkills={[]}
-        selectedSkills={[]}
-        setSelectedSkills={vi.fn()}
-        pendingSkills={[]}
-        setDeletePendingSkillName={vi.fn()}
-        setDeleteCustomSkillName={vi.fn()}
-        builtinAutoSkills={[]}
-        disabledBuiltinSkills={[]}
-        setDisabledBuiltinSkills={vi.fn()}
+        editor={createEditor({ prompts: { text: 'Prompt one\nPrompt two', setText: vi.fn() } })}
         activeAssistant={null}
-        availableBackends={[]}
-        handleDuplicate={vi.fn()}
       />
     );
 
@@ -193,49 +205,21 @@ describe('AssistantEditorSections', () => {
 
     renderWithProviders(
       <AssistantEditorSections
-        isCreating={true}
-        editName='Writer'
-        setEditName={vi.fn()}
-        editDescription='desc'
-        setEditDescription={vi.fn()}
-        editAvatar='✍️'
-        setEditAvatar={setEditAvatar}
-        setEditAvatarPreview={setEditAvatarPreview}
-        editAgent='claude'
-        setEditAgent={vi.fn()}
-        editRecommendedPromptsText=''
-        setEditRecommendedPromptsText={vi.fn()}
-        defaultModelMode='auto'
-        setDefaultModelMode={vi.fn()}
-        defaultModelValue=''
-        setDefaultModelValue={vi.fn()}
-        defaultPermissionMode='auto'
-        setDefaultPermissionMode={vi.fn()}
-        defaultPermissionValue=''
-        setDefaultPermissionValue={vi.fn()}
-        defaultSkillsMode='fixed'
-        setDefaultSkillsMode={vi.fn()}
-        defaultMcpMode='auto'
-        setDefaultMcpMode={vi.fn()}
-        availableMcpServers={[]}
-        selectedMcpIds={[]}
-        setSelectedMcpIds={vi.fn()}
-        editContext='rules'
-        setEditContext={vi.fn()}
-        promptViewMode='preview'
-        setPromptViewMode={vi.fn()}
-        availableSkills={[]}
-        selectedSkills={[]}
-        setSelectedSkills={vi.fn()}
-        pendingSkills={[]}
-        setDeletePendingSkillName={vi.fn()}
-        setDeleteCustomSkillName={vi.fn()}
-        builtinAutoSkills={[]}
-        disabledBuiltinSkills={[]}
-        setDisabledBuiltinSkills={vi.fn()}
+        editor={createEditor({
+          profile: {
+            avatar: '✍️',
+            setAvatar: setEditAvatar,
+            setAvatarPreview: setEditAvatarPreview,
+            name: 'Writer',
+            setName: vi.fn(),
+            description: 'desc',
+            setDescription: vi.fn(),
+          },
+          defaults: {
+            mcps: { mode: 'auto', setMode: vi.fn(), availableServers: [], selectedIds: [], setSelectedIds: vi.fn() },
+          },
+        })}
         activeAssistant={null}
-        availableBackends={[]}
-        handleDuplicate={vi.fn()}
       />
     );
 
@@ -252,48 +236,49 @@ describe('AssistantEditorSections', () => {
   it('keeps builtin default model and permission editable while showing prompts as read-only content', () => {
     const { container } = renderWithProviders(
       <AssistantEditorSections
-        isCreating={false}
-        editName='Cowork'
-        setEditName={vi.fn()}
-        editDescription='Builtin desc'
-        setEditDescription={vi.fn()}
-        editAvatar='🤝'
-        setEditAvatar={vi.fn()}
-        setEditAvatarPreview={vi.fn()}
-        editAgent='claude'
-        setEditAgent={vi.fn()}
-        editRecommendedPromptsText={'Prompt one\nPrompt two'}
-        setEditRecommendedPromptsText={vi.fn()}
-        defaultModelMode='fixed'
-        setDefaultModelMode={vi.fn()}
-        defaultModelValue='gemini-2.5-pro'
-        setDefaultModelValue={vi.fn()}
-        defaultPermissionMode='fixed'
-        setDefaultPermissionMode={vi.fn()}
-        defaultPermissionValue='default'
-        setDefaultPermissionValue={vi.fn()}
-        defaultSkillsMode='fixed'
-        setDefaultSkillsMode={vi.fn()}
-        defaultMcpMode='fixed'
-        setDefaultMcpMode={vi.fn()}
-        availableMcpServers={[{ id: 'mcp-a', name: 'Server A', enabled: true } as any]}
-        selectedMcpIds={['mcp-a']}
-        setSelectedMcpIds={vi.fn()}
-        editContext='builtin rules'
-        setEditContext={vi.fn()}
-        promptViewMode='preview'
-        setPromptViewMode={vi.fn()}
-        availableSkills={[
-          { name: 'browse', description: 'Browse the web', location: '', is_custom: false, source: 'builtin' },
-        ]}
-        selectedSkills={['browse']}
-        setSelectedSkills={vi.fn()}
-        pendingSkills={[]}
-        setDeletePendingSkillName={vi.fn()}
-        setDeleteCustomSkillName={vi.fn()}
-        builtinAutoSkills={[]}
-        disabledBuiltinSkills={[]}
-        setDisabledBuiltinSkills={vi.fn()}
+        editor={createEditor({
+          isCreating: false,
+          profile: {
+            name: 'Cowork',
+            setName: vi.fn(),
+            description: 'Builtin desc',
+            setDescription: vi.fn(),
+            avatar: '🤝',
+            setAvatar: vi.fn(),
+            setAvatarPreview: vi.fn(),
+          },
+          prompts: { text: 'Prompt one\nPrompt two', setText: vi.fn() },
+          defaults: {
+            model: { mode: 'fixed', setMode: vi.fn(), value: 'gemini-2.5-pro', setValue: vi.fn() },
+            permission: { mode: 'fixed', setMode: vi.fn(), value: 'default', setValue: vi.fn() },
+            mcps: {
+              mode: 'fixed',
+              setMode: vi.fn(),
+              availableServers: [{ id: 'mcp-a', name: 'Server A', enabled: true } as any],
+              selectedIds: ['mcp-a'],
+              setSelectedIds: vi.fn(),
+            },
+          },
+          rules: { content: 'builtin rules', setContent: vi.fn(), viewMode: 'preview', setViewMode: vi.fn() },
+          skills: {
+            availableSkills: [
+              { name: 'browse', description: 'Browse the web', location: '', is_custom: false, source: 'builtin' },
+            ],
+            selectedSkills: ['browse'],
+            setSelectedSkills: vi.fn(),
+            pendingSkills: [],
+            setDeletePendingSkillName: vi.fn(),
+            setDeleteCustomSkillName: vi.fn(),
+            builtinAutoSkills: [],
+            disabledBuiltinSkills: [],
+            setDisabledBuiltinSkills: vi.fn(),
+          },
+          agent: {
+            value: 'claude',
+            setValue: vi.fn(),
+            availableBackends: [{ id: 'claude', name: 'Claude', isExtension: false, modelOptions: [] }],
+          },
+        })}
         activeAssistant={{
           id: 'cowork',
           name: 'Cowork',
@@ -302,8 +287,6 @@ describe('AssistantEditorSections', () => {
           enabled: true,
           preset_agent_type: 'claude',
         }}
-        availableBackends={[{ id: 'claude', name: 'Claude', isExtension: false, modelOptions: [] }]}
-        handleDuplicate={vi.fn()}
       />
     );
 
@@ -330,51 +313,31 @@ describe('AssistantEditorSections', () => {
   it('renders single default-skill and default-mcp controls with hub links', () => {
     renderWithProviders(
       <AssistantEditorSections
-        isCreating={true}
-        editName='Writer'
-        setEditName={vi.fn()}
-        editDescription='desc'
-        setEditDescription={vi.fn()}
-        editAvatar='✍️'
-        setEditAvatar={vi.fn()}
-        setEditAvatarPreview={vi.fn()}
-        editAgent='claude'
-        setEditAgent={vi.fn()}
-        editRecommendedPromptsText=''
-        setEditRecommendedPromptsText={vi.fn()}
-        defaultModelMode='auto'
-        setDefaultModelMode={vi.fn()}
-        defaultModelValue=''
-        setDefaultModelValue={vi.fn()}
-        defaultPermissionMode='auto'
-        setDefaultPermissionMode={vi.fn()}
-        defaultPermissionValue=''
-        setDefaultPermissionValue={vi.fn()}
-        defaultSkillsMode='fixed'
-        setDefaultSkillsMode={vi.fn()}
-        defaultMcpMode='fixed'
-        setDefaultMcpMode={vi.fn()}
-        availableMcpServers={[{ id: 'mcp-a', name: 'Server A', enabled: true } as any]}
-        selectedMcpIds={['mcp-a']}
-        setSelectedMcpIds={vi.fn()}
-        editContext='rules'
-        setEditContext={vi.fn()}
-        promptViewMode='preview'
-        setPromptViewMode={vi.fn()}
-        availableSkills={[
-          { name: 'browse', description: 'Browse the web', location: '', is_custom: false, source: 'builtin' },
-        ]}
-        selectedSkills={['browse']}
-        setSelectedSkills={vi.fn()}
-        pendingSkills={[]}
-        setDeletePendingSkillName={vi.fn()}
-        setDeleteCustomSkillName={vi.fn()}
-        builtinAutoSkills={[]}
-        disabledBuiltinSkills={[]}
-        setDisabledBuiltinSkills={vi.fn()}
+        editor={createEditor({
+          defaults: {
+            mcps: {
+              mode: 'fixed',
+              setMode: vi.fn(),
+              availableServers: [{ id: 'mcp-a', name: 'Server A', enabled: true } as any],
+              selectedIds: ['mcp-a'],
+              setSelectedIds: vi.fn(),
+            },
+          },
+          skills: {
+            availableSkills: [
+              { name: 'browse', description: 'Browse the web', location: '', is_custom: false, source: 'builtin' },
+            ],
+            selectedSkills: ['browse'],
+            setSelectedSkills: vi.fn(),
+            pendingSkills: [],
+            setDeletePendingSkillName: vi.fn(),
+            setDeleteCustomSkillName: vi.fn(),
+            builtinAutoSkills: [],
+            disabledBuiltinSkills: [],
+            setDisabledBuiltinSkills: vi.fn(),
+          },
+        })}
         activeAssistant={null}
-        availableBackends={[]}
-        handleDuplicate={vi.fn()}
       />
     );
 
@@ -387,49 +350,14 @@ describe('AssistantEditorSections', () => {
   it('does not autofocus the rules textarea when edit mode is visible', () => {
     renderWithProviders(
       <AssistantEditorSections
-        isCreating={true}
-        editName='Writer'
-        setEditName={vi.fn()}
-        editDescription='desc'
-        setEditDescription={vi.fn()}
-        editAvatar='✍️'
-        setEditAvatar={vi.fn()}
-        setEditAvatarPreview={vi.fn()}
-        editAgent='claude'
-        setEditAgent={vi.fn()}
-        editRecommendedPromptsText=''
-        setEditRecommendedPromptsText={vi.fn()}
-        defaultModelMode='auto'
-        setDefaultModelMode={vi.fn()}
-        defaultModelValue=''
-        setDefaultModelValue={vi.fn()}
-        defaultPermissionMode='auto'
-        setDefaultPermissionMode={vi.fn()}
-        defaultPermissionValue=''
-        setDefaultPermissionValue={vi.fn()}
-        defaultSkillsMode='auto'
-        setDefaultSkillsMode={vi.fn()}
-        defaultMcpMode='auto'
-        setDefaultMcpMode={vi.fn()}
-        availableMcpServers={[]}
-        selectedMcpIds={[]}
-        setSelectedMcpIds={vi.fn()}
-        editContext='rules'
-        setEditContext={vi.fn()}
-        promptViewMode='edit'
-        setPromptViewMode={vi.fn()}
-        availableSkills={[]}
-        selectedSkills={[]}
-        setSelectedSkills={vi.fn()}
-        pendingSkills={[]}
-        setDeletePendingSkillName={vi.fn()}
-        setDeleteCustomSkillName={vi.fn()}
-        builtinAutoSkills={[]}
-        disabledBuiltinSkills={[]}
-        setDisabledBuiltinSkills={vi.fn()}
+        editor={createEditor({
+          defaults: {
+            skills: { mode: 'auto', setMode: vi.fn() },
+            mcps: { mode: 'auto', setMode: vi.fn(), availableServers: [], selectedIds: [], setSelectedIds: vi.fn() },
+          },
+          rules: { content: 'rules', setContent: vi.fn(), viewMode: 'edit', setViewMode: vi.fn() },
+        })}
         activeAssistant={null}
-        availableBackends={[]}
-        handleDuplicate={vi.fn()}
       />
     );
 
