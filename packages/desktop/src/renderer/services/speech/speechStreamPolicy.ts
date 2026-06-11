@@ -34,10 +34,7 @@ const STORAGE_KEY = 'aionui.sttStreamUnsupported';
  *   - other OPENAI preset → 'supported'
  *   - non-preset model → 'unknown'
  */
-export const getModelStreamCapability = (
-  source: 'openai' | 'deepgram' | 'custom',
-  model: string
-): StreamCapability => {
+export const getModelStreamCapability = (source: 'openai' | 'deepgram' | 'custom', model: string): StreamCapability => {
   if (source === 'custom') {
     return 'unknown';
   }
