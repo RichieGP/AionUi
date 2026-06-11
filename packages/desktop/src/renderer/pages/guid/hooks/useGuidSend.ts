@@ -52,8 +52,11 @@ export type GuidSendDeps = {
   ) => string[] | undefined;
   guidDisabledBuiltinSkills: string[] | undefined;
   guidEnabledSkills: string[] | undefined;
+  assistantDefaultSkillIds?: string[];
+  assistantDefaultDisabledBuiltinSkillIds?: string[];
   availableMcpServers: IMcpServer[];
   selectedMcpServerIds: string[] | undefined;
+  assistantDefaultMcpIds?: string[];
   currentEffectiveAgentInfo: EffectiveAgentInfo;
   isGoogleAuth: boolean;
 
@@ -102,8 +105,11 @@ export const useGuidSend = (deps: GuidSendDeps): GuidSendResult => {
     resolveDisabledBuiltinSkills,
     guidDisabledBuiltinSkills,
     guidEnabledSkills,
+    assistantDefaultSkillIds,
+    assistantDefaultDisabledBuiltinSkillIds,
     availableMcpServers,
     selectedMcpServerIds,
+    assistantDefaultMcpIds,
     currentEffectiveAgentInfo: _currentEffectiveAgentInfo,
     isGoogleAuth,
     setMentionOpen,
@@ -132,14 +138,18 @@ export const useGuidSend = (deps: GuidSendDeps): GuidSendResult => {
     // agents we still forward the user's selection (the backend accepts
     // `preset_enabled_skills` regardless of `is_preset`).
     const presetEnabledSkillsDefault = resolveEnabledSkills(agentInfo);
-    const enabled_skills = guidEnabledSkills ?? presetEnabledSkillsDefault;
+    const enabled_skills =
+      guidEnabledSkills ?? (is_presetAgent ? assistantDefaultSkillIds : presetEnabledSkillsDefault);
     const enabled_skills_to_send = is_presetAgent
       ? enabled_skills
       : guidEnabledSkills?.length
         ? guidEnabledSkills
         : undefined;
-    const excludeBuiltinSkills = guidDisabledBuiltinSkills ?? resolveDisabledBuiltinSkills(agentInfo);
-    const selectedMcpServerIdSet = new Set(selectedMcpServerIds ?? []);
+    const excludeBuiltinSkills =
+      guidDisabledBuiltinSkills ??
+      (is_presetAgent ? assistantDefaultDisabledBuiltinSkillIds : resolveDisabledBuiltinSkills(agentInfo));
+    const selectedAllMcpServerIds = selectedMcpServerIds ?? [];
+    const selectedMcpServerIdSet = new Set(selectedAllMcpServerIds);
     const selectedUserMcpServerIds = availableMcpServers
       .filter((server) => selectedMcpServerIdSet.has(server.id) && server.builtin !== true)
       .map((server) => server.id);
@@ -149,6 +159,20 @@ export const useGuidSend = (deps: GuidSendDeps): GuidSendResult => {
     const selectedSessionMcpServers = availableMcpServers
       .filter((server) => selectedMcpServerIdSet.has(server.id) && server.builtin === true)
       .map((server) => toSessionMcpServer(server));
+    const defaultSelectedMcpServerIds = assistantDefaultMcpIds;
+    const defaultSelectedUserMcpServerIds = availableMcpServers
+      .filter((server) => (defaultSelectedMcpServerIds ?? []).includes(server.id) && server.builtin !== true)
+      .map((server) => server.id);
+    const assistantOverrideMcpIds =
+      selectedMcpServerIds !== undefined ? selectedAllMcpServerIds : defaultSelectedMcpServerIds;
+    const selectedUserMcpServerIdsToSend =
+      selectedMcpServerIds !== undefined ? selectedUserMcpServerIds : defaultSelectedUserMcpServerIds;
+    const selectedSessionMcpServersToSend =
+      selectedMcpServerIds !== undefined
+        ? selectedAllSessionMcpServers
+        : availableMcpServers
+            .filter((server) => (defaultSelectedMcpServerIds ?? []).includes(server.id))
+            .map((server) => toSessionMcpServer(server));
 
     const finalEffectiveAgentType = effectiveAgentType;
     const assistantOverrideModel =
@@ -158,6 +182,7 @@ export const useGuidSend = (deps: GuidSendDeps): GuidSendResult => {
       permission: selectedMode || undefined,
       skill_ids: enabled_skills_to_send,
       disabled_builtin_skill_ids: excludeBuiltinSkills,
+      mcp_ids: assistantOverrideMcpIds,
     };
 
     // Aionrs path (direct selection or preset assistant with aionrs as main agent)
@@ -171,19 +196,21 @@ export const useGuidSend = (deps: GuidSendDeps): GuidSendResult => {
           type: 'aionrs',
           name: input,
           model: current_model,
+          assistant:
+            preset_assistant_id && is_preset
+              ? {
+                  id: preset_assistant_id,
+                  locale: localeKey,
+                  conversation_overrides: assistantOverrides,
+                }
+              : undefined,
           extra: {
             default_files: files,
             workspace: finalWorkspace,
             custom_workspace: isCustomWorkspace,
-            assistant_id: preset_assistant_id,
-            assistant_locale: localeKey,
-            assistant_overrides: is_preset ? { ...assistantOverrides, mcp_ids: selectedUserMcpServerIds } : undefined,
-            selected_mcp_server_ids: selectedUserMcpServerIds,
-            // aionrs should consume the authoritative session snapshot, just
-            // like team MCP does, instead of reloading only user servers from
-            // the global MCP repository at runtime.
-            selected_session_mcp_servers: selectedAllSessionMcpServers,
             preset_assistant_id,
+            selected_mcp_server_ids: selectedUserMcpServerIdsToSend,
+            selected_session_mcp_servers: selectedSessionMcpServersToSend,
             session_mode: selectedMode,
           },
         });
@@ -260,14 +287,12 @@ export const useGuidSend = (deps: GuidSendDeps): GuidSendResult => {
         session_mode: selectedMode,
         current_model_id: selectedAcpModel || currentAcpCachedModelInfo?.current_model_id || undefined,
         assistant_locale: localeKey,
-        assistant_overrides: {
-          ...assistantOverrides,
-          mcp_ids: selectedUserMcpServerIds,
-        },
+        assistant_conversation_overrides: assistantOverrides,
         extra: {
           default_files: files,
-          selected_mcp_server_ids: selectedUserMcpServerIds,
-          selected_session_mcp_servers: selectedSessionMcpServers,
+          selected_mcp_server_ids: selectedUserMcpServerIdsToSend,
+          selected_session_mcp_servers:
+            selectedMcpServerIds !== undefined ? selectedSessionMcpServers : selectedSessionMcpServersToSend,
         },
       });
 
@@ -320,8 +345,12 @@ export const useGuidSend = (deps: GuidSendDeps): GuidSendResult => {
     resolveEnabledSkills,
     resolveDisabledBuiltinSkills,
     guidDisabledBuiltinSkills,
+    guidEnabledSkills,
+    assistantDefaultSkillIds,
+    assistantDefaultDisabledBuiltinSkillIds,
     availableMcpServers,
     selectedMcpServerIds,
+    assistantDefaultMcpIds,
     navigate,
     t,
     localeKey,

@@ -219,6 +219,38 @@ describe('AssistantEditorSections', () => {
     expect(within(defaultsCard).getByText('User MCP、Disabled MCP、Builtin MCP')).toBeInTheDocument();
   });
 
+  it('uses provider-backed models for aionrs even when detected agent metadata exposes model options', () => {
+    mockUseModelProviderList.mockReturnValue({
+      providers: [{ id: 'provider-a', name: 'Provider A', model: ['provider-model'], enabled: true }],
+      getAvailableModels: () => ['provider-model'],
+    });
+
+    renderWithProviders(
+      <AssistantEditorSections
+        editor={createEditor({
+          agent: {
+            value: 'aionrs',
+            setValue: vi.fn(),
+            availableBackends: [
+              {
+                id: 'aionrs',
+                name: 'Aionrs',
+                modelOptions: [{ value: 'handshake-model', label: 'Handshake Model' }],
+              },
+            ],
+          },
+          defaults: {
+            model: { mode: 'fixed', setMode: vi.fn(), value: 'provider-model', setValue: vi.fn() },
+          },
+        })}
+        activeAssistant={null}
+      />
+    );
+
+    expect(screen.getByTestId('select-assistant-default-model')).toHaveTextContent('Provider A · provider-model');
+    expect(screen.getByTestId('select-assistant-default-model')).not.toHaveTextContent('Handshake Model');
+  });
+
   it('renders recommended prompts as a list with actions', () => {
     renderWithProviders(
       <AssistantEditorSections

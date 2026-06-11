@@ -89,12 +89,10 @@ const GuidPage: React.FC = () => {
     void ensureBackendMcpCatalog()
       .then(({ allServers }) => {
         setAvailableMcpServers(allServers);
-        setGuidSelectedMcpServerIds((prev) => prev ?? []);
       })
       .catch((error) => {
         console.error('[GuidPage] Failed to load MCP catalog:', error);
         setAvailableMcpServers([]);
-        setGuidSelectedMcpServerIds((prev) => prev ?? []);
       });
   }, []);
 
@@ -149,6 +147,19 @@ const GuidPage: React.FC = () => {
     selectedAgentInfo: agentSelection.selectedAgentInfo,
   });
 
+  const selectedAssistantId = agentSelection.is_presetAgent ? agentSelection.selectedAgentInfo?.custom_agent_id : null;
+  const { data: selectedAssistantDetail } = useSWR(
+    selectedAssistantId ? `guid.assistant.detail.${selectedAssistantId}.${localeKey}` : null,
+    async (): Promise<AssistantDetail | null> =>
+      ipcBridge.assistants.get
+        .invoke({ id: selectedAssistantId!, locale: localeKey })
+        .catch((_error: unknown): AssistantDetail | null => null)
+  );
+  const resolvedAssistantDefaults = useMemo(
+    () => resolveGuidAssistantDefaults(selectedAssistantDetail),
+    [selectedAssistantDetail]
+  );
+
   const send = useGuidSend({
     // Input state
     input: guidInput.input,
@@ -177,8 +188,11 @@ const GuidPage: React.FC = () => {
     resolveDisabledBuiltinSkills: agentSelection.resolveDisabledBuiltinSkills,
     guidDisabledBuiltinSkills,
     guidEnabledSkills,
+    assistantDefaultSkillIds: resolvedAssistantDefaults.skillIds,
+    assistantDefaultDisabledBuiltinSkillIds: resolvedAssistantDefaults.disabledBuiltinSkillIds,
     availableMcpServers,
     selectedMcpServerIds: guidSelectedMcpServerIds,
+    assistantDefaultMcpIds: resolvedAssistantDefaults.mcpIds,
     currentEffectiveAgentInfo: agentSelection.currentEffectiveAgentInfo,
     isGoogleAuth: modelSelection.isGoogleAuth,
 
@@ -193,15 +207,6 @@ const GuidPage: React.FC = () => {
     t,
     localeKey,
   });
-
-  const selectedAssistantId = agentSelection.is_presetAgent ? agentSelection.selectedAgentInfo?.custom_agent_id : null;
-  const { data: selectedAssistantDetail } = useSWR(
-    selectedAssistantId ? `guid.assistant.detail.${selectedAssistantId}.${localeKey}` : null,
-    async (): Promise<AssistantDetail | null> =>
-      ipcBridge.assistants.get
-        .invoke({ id: selectedAssistantId!, locale: localeKey })
-        .catch((_error: unknown): AssistantDetail | null => null)
-  );
 
   // --- Coordinated handlers (depend on multiple hooks) ---
   const handleInputChange = useCallback(

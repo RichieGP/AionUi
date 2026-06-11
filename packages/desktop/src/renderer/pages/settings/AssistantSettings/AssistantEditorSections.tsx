@@ -82,16 +82,16 @@ const AssistantEditorSections: React.FC<AssistantEditorSectionsProps> = ({ edito
     }))
   );
   const modelOptions = useMemo(() => {
+    if (editAgent === 'aionrs') {
+      return providerModelOptions;
+    }
+
     if (currentBackend && currentBackend.modelOptions.length > 0) {
       return currentBackend.modelOptions.map((model) => ({
         key: `${editAgent}-${model.value}`,
         value: model.value,
         label: model.label,
       }));
-    }
-
-    if (editAgent === 'aionrs') {
-      return providerModelOptions;
     }
 
     return [];

@@ -87,6 +87,27 @@ test.describe('Assistant Settings Defaults', () => {
     await closeAssistantEditor(page);
   });
 
+  test('default dropdown popup stays inside the editor scroll container', async ({ page }) => {
+    await goToAssistantSettings(page);
+    await clickCreateAssistant(page);
+    await fillAssistantName(page, `Popup Root ${Date.now()}`);
+
+    await openSelect(page, 'select-assistant-default-model');
+
+    const localPopup = page.locator('[data-testid="assistant-editor-body"] .arco-trigger-popup').last();
+    await expect(localPopup).toBeVisible();
+    await expect(localPopup.evaluate((node) => Boolean(node.closest('[data-editor-popup-root]')))).resolves.toBe(true);
+
+    const editorBody = page.locator('[data-testid="assistant-editor-body"]');
+    await editorBody.evaluate((node) => {
+      node.scrollTop += 160;
+    });
+
+    await expect(localPopup).toBeVisible();
+
+    await closeAssistantEditor(page);
+  });
+
   test('changing main agent clears fixed model and permission back to Remember last used automatically', async ({
     page,
   }) => {

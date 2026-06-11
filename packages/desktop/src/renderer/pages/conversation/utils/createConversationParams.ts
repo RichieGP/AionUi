@@ -213,7 +213,7 @@ export async function buildPresetAssistantParams(
     is_preset: true,
     preset_agent_type,
     assistant_locale: localeKey,
-    assistant_overrides: {
+    assistant_conversation_overrides: {
       model: preferredAcpModelId,
       skill_ids: assistant.enabled_skills.length > 0 ? assistant.enabled_skills : undefined,
       disabled_builtin_skill_ids:

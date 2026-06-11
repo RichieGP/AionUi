@@ -31,7 +31,7 @@ export type BuildAgentConversationInput = {
   session_mode?: string;
   current_model_id?: string;
   assistant_locale?: string;
-  assistant_overrides?: BuildAgentConversationAssistantOverrides;
+  assistant_conversation_overrides?: BuildAgentConversationAssistantOverrides;
   extra?: Partial<ICreateConversationParams['extra']>;
 };
 
@@ -56,7 +56,7 @@ export function buildAgentConversationParams(input: BuildAgentConversationInput)
     session_mode,
     current_model_id,
     assistant_locale,
-    assistant_overrides,
+    assistant_conversation_overrides,
     extra: extraOverrides,
   } = input;
 
@@ -70,9 +70,7 @@ export function buildAgentConversationParams(input: BuildAgentConversationInput)
   };
 
   if (is_preset) {
-    if (effectivePresetAssistantId) {
-      extra.assistant_id = effectivePresetAssistantId;
-    }
+    extra.preset_assistant_id = effectivePresetAssistantId;
     if (type === 'acp') {
       extra.backend = effectivePresetType as string;
     }
@@ -83,12 +81,9 @@ export function buildAgentConversationParams(input: BuildAgentConversationInput)
     if (cli_path) extra.cli_path = cli_path;
     if (custom_agent_id) {
       extra.custom_agent_id = custom_agent_id;
-      extra.assistant_id = custom_agent_id;
     }
   }
 
-  if (assistant_locale) extra.assistant_locale = assistant_locale;
-  if (assistant_overrides) extra.assistant_overrides = assistant_overrides;
   if (session_mode) extra.session_mode = session_mode;
   if (current_model_id) extra.current_model_id = current_model_id;
 
@@ -96,6 +91,13 @@ export function buildAgentConversationParams(input: BuildAgentConversationInput)
     type,
     model,
     name,
+    assistant: effectivePresetAssistantId
+      ? {
+          id: effectivePresetAssistantId,
+          locale: assistant_locale,
+          conversation_overrides: assistant_conversation_overrides,
+        }
+      : undefined,
     extra,
   };
 }
