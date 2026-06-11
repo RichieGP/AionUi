@@ -97,17 +97,30 @@ export const appendSpeechTranscript = (base: string, transcript: string): string
   return `${normalizedBase}\n${normalizedTranscript}`;
 };
 
+/** CJK Unified Ideographs + extension A + CJK/fullwidth punctuation. */
+const CJK_BOUNDARY_CHAR = /[　-〿㐀-䶿一-鿿＀-￯]/;
+
+/** Join transcript segments: CJK-adjacent boundaries concatenate directly, otherwise a single space. */
+export const joinTranscriptSegments = (segments: string[]): string => {
+  return segments
+    .map((segment) => segment.trim())
+    .filter(Boolean)
+    .reduce((joined, segment) => {
+      if (!joined) {
+        return segment;
+      }
+      const isCjkBoundary = CJK_BOUNDARY_CHAR.test(joined[joined.length - 1]) || CJK_BOUNDARY_CHAR.test(segment[0]);
+      return `${joined}${isCjkBoundary ? '' : ' '}${segment}`;
+    }, '');
+};
+
 /**
  * Compose the live display text for a streaming session: committed finals
- * joined by newline, with the in-flight partial appended after a newline when
- * finals exist (partial alone otherwise).
+ * plus the in-flight partial, joined as one continuous utterance
+ * (VAD pause boundaries must not introduce line breaks).
  */
 export const composeLiveTranscript = (finals: string[], partial: string): string => {
-  const joined = finals.join('\n');
-  if (!partial) {
-    return joined;
-  }
-  return joined ? `${joined}\n${partial}` : partial;
+  return joinTranscriptSegments(partial ? [...finals, partial] : finals);
 };
 
 export const getSpeechInputErrorMessageKey = (errorCode: SpeechInputErrorCode): string => {
@@ -440,7 +453,7 @@ export const useSpeechInput = ({ locale, onLiveTranscript, onTranscript }: UseSp
       void session.recorder.stop();
       clearLiveTranscript(session);
 
-      const transcript = session.finals.join('\n').trim();
+      const transcript = joinTranscriptSegments(session.finals);
       if (!transcript) {
         setErrorCode('empty-transcript');
         setErrorMessage(null);

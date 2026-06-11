@@ -21,7 +21,9 @@ import {
   applySpeechSource,
   buildModelOptions,
   deriveSpeechSource,
+  getAutoTranscriptionPrompt,
   isValidHttpUrl,
+  migrateSpeechLanguage,
   normalizeSpeechToTextConfig,
   type SpeechSource,
 } from './speechSettingsUtils';
@@ -56,7 +58,7 @@ const VoiceInputSection: React.FC = () => {
   useEffect(() => {
     try {
       const stored = configService.get('tools.speechToText');
-      const normalized = normalizeSpeechToTextConfig(stored);
+      const normalized = migrateSpeechLanguage(normalizeSpeechToTextConfig(stored));
       setConfig(normalized);
       setSource(deriveSpeechSource(normalized));
       if (deriveSpeechSource(normalized) === 'custom') {
@@ -143,11 +145,24 @@ const VoiceInputSection: React.FC = () => {
     (value: string) => {
       if (isDeepgram) {
         handleDeepgramChange('language', value);
-      } else {
-        handleOpenAIChange('language', value);
+        return;
       }
+      // Whisper-family `zh` is script-ambiguous: pair the language with a
+      // same-script prompt (undefined clears it for non-Chinese languages).
+      updateConfig(
+        (current) =>
+          ({
+            ...current,
+            openai: {
+              ...DEFAULT_SPEECH_TO_TEXT_CONFIG.openai,
+              ...current.openai,
+              language: value,
+              prompt: getAutoTranscriptionPrompt(value),
+            },
+          }) as SpeechToTextConfig
+      );
     },
-    [handleDeepgramChange, handleOpenAIChange, isDeepgram]
+    [handleDeepgramChange, isDeepgram, updateConfig]
   );
 
   const handleApiKeyChange = useCallback(
@@ -228,9 +243,7 @@ const VoiceInputSection: React.FC = () => {
                   return (
                     <AionSelect.Option key={model} value={model}>
                       {model}
-                      {badgeText !== null && (
-                        <span className='text-12px text-t-tertiary ml-8px'>{badgeText}</span>
-                      )}
+                      {badgeText !== null && <span className='text-12px text-t-tertiary ml-8px'>{badgeText}</span>}
                     </AionSelect.Option>
                   );
                 })}

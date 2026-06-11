@@ -59,7 +59,7 @@ vi.mock('@/renderer/services/speech/speechStreamPolicy', () => ({
   shouldTryStreaming: mocks.shouldTryStreaming,
 }));
 
-import { composeLiveTranscript, useSpeechInput } from '@/renderer/hooks/system/useSpeechInput';
+import { composeLiveTranscript, joinTranscriptSegments, useSpeechInput } from '@/renderer/hooks/system/useSpeechInput';
 
 const makeConfig = (): SpeechToTextConfig => ({
   enabled: true,
@@ -155,17 +155,47 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
+describe('joinTranscriptSegments', () => {
+  it('joins latin segments with a single space', () => {
+    expect(joinTranscriptSegments(['hello there', 'how are you'])).toBe('hello there how are you');
+  });
+
+  it('joins CJK-adjacent segments directly', () => {
+    expect(joinTranscriptSegments(['你好', '世界'])).toBe('你好世界');
+  });
+
+  it('joins directly when only one side of the boundary is CJK', () => {
+    expect(joinTranscriptSegments(['我在用', 'AionUi'])).toBe('我在用AionUi');
+    expect(joinTranscriptSegments(['open', '设置页'])).toBe('open设置页');
+  });
+
+  it('treats CJK punctuation as a CJK boundary', () => {
+    expect(joinTranscriptSegments(['你好。', 'then'])).toBe('你好。then');
+  });
+
+  it('trims leading/trailing whitespace of each segment', () => {
+    expect(joinTranscriptSegments(['  hello ', ' world  '])).toBe('hello world');
+  });
+
+  it('drops empty and whitespace-only segments', () => {
+    expect(joinTranscriptSegments(['', 'a', '   ', 'b'])).toBe('a b');
+    expect(joinTranscriptSegments([])).toBe('');
+  });
+});
+
 describe('composeLiveTranscript', () => {
-  it('joins finals with newlines', () => {
-    expect(composeLiveTranscript(['a', 'b'], '')).toBe('a\nb');
+  it('joins finals as one continuous utterance', () => {
+    expect(composeLiveTranscript(['a', 'b'], '')).toBe('a b');
+    expect(composeLiveTranscript(['你好', '世界'], '')).toBe('你好世界');
   });
 
   it('returns the partial alone when there are no finals', () => {
     expect(composeLiveTranscript([], 'typing')).toBe('typing');
   });
 
-  it('appends the partial after a newline when finals exist', () => {
-    expect(composeLiveTranscript(['a', 'b'], 'c')).toBe('a\nb\nc');
+  it('appends the partial after finals with the same boundary rule', () => {
+    expect(composeLiveTranscript(['a', 'b'], 'c')).toBe('a b c');
+    expect(composeLiveTranscript(['你好'], '世界')).toBe('你好世界');
   });
 
   it('returns an empty string when both are empty', () => {
@@ -201,9 +231,9 @@ describe('useSpeechInput streaming orchestration', () => {
     act(() => stream.callbacks().onFinal('final1'));
     expect(onLiveTranscript).toHaveBeenLastCalledWith('final1');
     act(() => stream.callbacks().onPartial('fin'));
-    expect(onLiveTranscript).toHaveBeenLastCalledWith('final1\nfin');
+    expect(onLiveTranscript).toHaveBeenLastCalledWith('final1 fin');
     act(() => stream.callbacks().onFinal('final2'));
-    expect(onLiveTranscript).toHaveBeenLastCalledWith('final1\nfinal2');
+    expect(onLiveTranscript).toHaveBeenLastCalledWith('final1 final2');
 
     act(() => {
       result.current.stopRecording();
@@ -217,7 +247,7 @@ describe('useSpeechInput streaming orchestration', () => {
     });
 
     expect(onLiveTranscript).toHaveBeenLastCalledWith(null);
-    expect(onTranscript).toHaveBeenCalledWith('final1\nfinal2');
+    expect(onTranscript).toHaveBeenCalledWith('final1 final2');
     // The live display is cleared before the terminal transcript is delivered.
     const clearOrder = onLiveTranscript.mock.invocationCallOrder.at(-1)!;
     expect(clearOrder).toBeLessThan(onTranscript.mock.invocationCallOrder[0]);

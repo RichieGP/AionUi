@@ -110,12 +110,22 @@ describe('VoiceInputSection', () => {
 
     // gpt-4o-transcribe option should carry the streaming badge (multiple elements ok — arco renders
     // options in hidden + visible lists)
-    await waitFor(() =>
-      expect(screen.getAllByText('settings.speechToTextStreamingBadge').length).toBeGreaterThan(0)
-    );
+    await waitFor(() => expect(screen.getAllByText('settings.speechToTextStreamingBadge').length).toBeGreaterThan(0));
 
     // whisper-1 option should carry the batch badge
     expect(screen.getAllByText('settings.speechToTextWholeBadge').length).toBeGreaterThan(0);
+  });
+
+  it('migrates a stored ambiguous zh language to Simplified Chinese on load', async () => {
+    configStore.value = {
+      enabled: true,
+      provider: 'openai',
+      openai: { api_key: 'k', base_url: '', model: 'whisper-1', language: 'zh' },
+    };
+    render(<VoiceInputSection />);
+    await waitFor(() => expect(screen.getByText('settings.speechToTextLanguage')).toBeTruthy());
+    // The language select displays the migrated zh-CN option label.
+    await waitFor(() => expect(screen.getByText('中文（简体）')).toBeTruthy());
   });
 
   it('deepgram mode shows formatting switches', async () => {

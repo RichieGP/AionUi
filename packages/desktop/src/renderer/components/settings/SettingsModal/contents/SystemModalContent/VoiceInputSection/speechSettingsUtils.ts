@@ -13,7 +13,8 @@ export type SpeechSource = 'openai' | 'deepgram' | 'custom';
 /** Language autonyms are intentionally not translated. Empty value = auto detect. */
 export const SPEECH_LANGUAGE_OPTIONS: Array<{ value: string; label?: string }> = [
   { value: '' },
-  { value: 'zh', label: '中文' },
+  { value: 'zh-CN', label: '中文（简体）' },
+  { value: 'zh-TW', label: '中文（繁體）' },
   { value: 'en', label: 'English' },
   { value: 'ja', label: '日本語' },
   { value: 'ko', label: '한국어' },
@@ -25,6 +26,36 @@ export const SPEECH_LANGUAGE_OPTIONS: Array<{ value: string; label?: string }> =
   { value: 'tr', label: 'Türkçe' },
   { value: 'uk', label: 'Українська' },
 ];
+
+/**
+ * Whisper-family models do not distinguish Simplified/Traditional Chinese for
+ * `language=zh`; a same-script prompt steers the output script.
+ */
+export const AUTO_TRANSCRIPTION_PROMPTS: Record<string, string> = {
+  'zh-CN': '以下是普通话的句子。',
+  'zh-TW': '以下是普通話的句子。',
+};
+
+export const getAutoTranscriptionPrompt = (language: string): string | undefined =>
+  AUTO_TRANSCRIPTION_PROMPTS[language];
+
+/**
+ * Phase 1 stored the ambiguous 'zh' language: migrate it to 'zh-CN' for both
+ * provider sub-configs (and inject the matching OpenAI script prompt).
+ */
+export const migrateSpeechLanguage = (config: SpeechToTextConfig): SpeechToTextConfig => {
+  let next = config;
+  if (next.openai?.language === 'zh') {
+    next = {
+      ...next,
+      openai: { ...next.openai, language: 'zh-CN', prompt: getAutoTranscriptionPrompt('zh-CN') },
+    };
+  }
+  if (next.deepgram?.language === 'zh') {
+    next = { ...next, deepgram: { ...next.deepgram, language: 'zh-CN' } };
+  }
+  return next;
+};
 
 export const DEFAULT_SPEECH_TO_TEXT_CONFIG: SpeechToTextConfig = {
   enabled: false,
