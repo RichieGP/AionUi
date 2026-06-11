@@ -44,7 +44,6 @@ type SpeechInputEnvironment = {
 };
 
 type UseSpeechInputOptions = {
-  locale?: string;
   /**
    * Live transcript of the current STREAMING session (finals + trailing
    * partial). Called with `null` exactly once per streaming session to clear
@@ -242,7 +241,7 @@ const mapSpeechInputError = (error: unknown): SpeechInputErrorCode => {
   return 'unknown';
 };
 
-export const useSpeechInput = ({ locale, onLiveTranscript, onTranscript }: UseSpeechInputOptions) => {
+export const useSpeechInput = ({ onLiveTranscript, onTranscript }: UseSpeechInputOptions) => {
   const [status, setStatus] = useState<SpeechInputStatus>('idle');
   const [errorCode, setErrorCode] = useState<SpeechInputErrorCode | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -261,8 +260,6 @@ export const useSpeechInput = ({ locale, onLiveTranscript, onTranscript }: UseSp
   const onLiveTranscriptRef = useLatestRef(onLiveTranscript);
   const streamSessionRef = useRef<StreamingSession | null>(null);
   const availability = useMemo(() => getSpeechInputAvailability(), []);
-
-  const recognitionLocale = locale?.trim() || 'en-US';
 
   const pauseSpeechVisualizer = useCallback(() => {
     if (visualizerIntervalRef.current !== null) {
@@ -390,7 +387,9 @@ export const useSpeechInput = ({ locale, onLiveTranscript, onTranscript }: UseSp
         setStatus('transcribing');
         setErrorCode(null);
         setErrorMessage(null);
-        const result = await transcribeAudioBlob(blob, recognitionLocale);
+        // No languageHint: the configured STT language (or provider-native
+        // auto detection) is the only language signal.
+        const result = await transcribeAudioBlob(blob);
         const transcript = result.text.trim();
         if (!transcript) {
           setErrorCode('empty-transcript');
@@ -412,7 +411,7 @@ export const useSpeechInput = ({ locale, onLiveTranscript, onTranscript }: UseSp
         resetSpeechVisualizer();
       }
     },
-    [onTranscriptRef, recognitionLocale, resetSpeechVisualizer]
+    [onTranscriptRef, resetSpeechVisualizer]
   );
 
   const emitLiveTranscript = useCallback(
@@ -542,8 +541,9 @@ export const useSpeechInput = ({ locale, onLiveTranscript, onTranscript }: UseSp
       };
       const isActive = () => streamSessionRef.current === session;
 
+      // No languageHint: language comes from the STT settings (config-first on
+      // the server); omitting the hint keeps explicit auto-detect truly auto.
       handle = startSpeechStream({
-        languageHint: recognitionLocale,
         callbacks: {
           onReady: () => {
             // Chunk buffering/flushing is handled inside the stream client.
@@ -583,14 +583,7 @@ export const useSpeechInput = ({ locale, onLiveTranscript, onTranscript }: UseSp
       await startSpeechVisualizer(recorder.stream);
       return true;
     },
-    [
-      emitLiveTranscript,
-      fallbackStreamingSession,
-      finishStreamingSession,
-      recognitionLocale,
-      resetSpeechVisualizer,
-      startSpeechVisualizer,
-    ]
+    [emitLiveTranscript, fallbackStreamingSession, finishStreamingSession, resetSpeechVisualizer, startSpeechVisualizer]
   );
 
   const startRecording = useCallback(async () => {

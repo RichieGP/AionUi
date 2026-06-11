@@ -133,7 +133,7 @@ const getUserMedia = vi.fn();
 const renderSpeechInput = () => {
   const onTranscript = vi.fn();
   const onLiveTranscript = vi.fn();
-  const rendered = renderHook(() => useSpeechInput({ locale: 'zh', onLiveTranscript, onTranscript }));
+  const rendered = renderHook(() => useSpeechInput({ onLiveTranscript, onTranscript }));
   return { ...rendered, onLiveTranscript, onTranscript };
 };
 
@@ -216,7 +216,10 @@ describe('useSpeechInput streaming orchestration', () => {
     });
     expect(result.current.status).toBe('recording');
     expect(mocks.shouldTryStreaming).toHaveBeenCalledWith(makeConfig());
-    expect(mocks.startSpeechStream).toHaveBeenCalledWith(expect.objectContaining({ languageHint: 'zh' }));
+    // The configured STT language is the only language signal: the start frame
+    // must NOT carry a UI-locale languageHint (auto-detect stays truly auto).
+    expect(mocks.startSpeechStream).toHaveBeenCalledTimes(1);
+    expect(mocks.startSpeechStream.mock.calls[0][0]).not.toHaveProperty('languageHint');
 
     // Recorder chunks are piped into the stream handle unchanged.
     const chunk = new Uint8Array([9, 8, 7]);
@@ -297,7 +300,8 @@ describe('useSpeechInput streaming orchestration', () => {
     expect(mocks.rememberStreamUnsupported).toHaveBeenCalledWith(makeConfig());
     expect(recorder.handle.stop).toHaveBeenCalled();
     expect(mocks.encodeWavPcm16).toHaveBeenCalledWith(STREAM_PCM, 24000, 1);
-    expect(mocks.transcribeAudioBlob).toHaveBeenCalledWith(mocks.encodeWavPcm16.mock.results[0].value, 'zh');
+    // Fallback transcription carries no UI-locale language hint either.
+    expect(mocks.transcribeAudioBlob).toHaveBeenCalledWith(mocks.encodeWavPcm16.mock.results[0].value);
     expect(result.current.status).toBe('idle');
 
     // The live display is cleared before the fallback transcription starts.

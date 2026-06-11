@@ -222,7 +222,7 @@ const SendBox: React.FC<{
   const effectiveDefaultMultiLine = defaultMultiLine && !isMobileCompact;
   const conversationContext = useConversationContextSafe();
   const teamPermission = useTeamPermission();
-  const { t, i18n } = useTranslation();
+  const { t } = useTranslation();
   const [isLoading, setIsLoading] = useState(false);
   const [isSingleLine, setIsSingleLine] = useState(!effectiveDefaultMultiLine);
   const [isInputFocused, setIsInputFocused] = useState(false);
@@ -1254,7 +1254,6 @@ const SendBox: React.FC<{
     [speechDispatch]
   );
   const { handleLiveTranscript } = useLiveTranscriptInsertion(speechDispatch.dispatch);
-  const speechLocale = i18n?.language || 'en-US';
 
   const hasDraftToSend = input.trim().length > 0 || domSnippets.length > 0;
 
@@ -1324,7 +1323,6 @@ const SendBox: React.FC<{
   const renderedSpeechButton = isMobileCompact ? null : (
     <SpeechInputButton
       disabled={disabled || isLoading || loading || isUploading}
-      locale={speechLocale}
       onLiveTranscript={handleLiveTranscript}
       onTranscript={handleSpeechTranscript}
     />

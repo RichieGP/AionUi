@@ -606,7 +606,6 @@ const GuidPage: React.FC = () => {
       speechInputNode={
         <SpeechInputButton
           disabled={guidInput.loading}
-          locale={i18n.language}
           onLiveTranscript={handleLiveTranscript}
           onTranscript={handleSpeechTranscript}
         />
