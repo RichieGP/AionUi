@@ -13,6 +13,14 @@ import { describe, expect, it } from 'vitest';
 const repoRoot = resolve(__dirname, '../../..');
 
 describe('build-with-builder', () => {
+  it.each(['x64', 'arm64'])('uses exact app process checks in the Windows %s NSIS include', (arch) => {
+    const script = readFileSync(resolve(repoRoot, `resources/windows-installer-${arch}.nsh`), 'utf8');
+
+    expect(script).toContain('!macro customCheckAppRunning');
+    expect(script).toContain('$INSTDIR\\${APP_EXECUTABLE_FILENAME}');
+    expect(script).not.toContain("StartsWith('$INSTDIR'");
+  });
+
   it.each([
     {
       args: ['arm64', '--win', '--arm64'],
