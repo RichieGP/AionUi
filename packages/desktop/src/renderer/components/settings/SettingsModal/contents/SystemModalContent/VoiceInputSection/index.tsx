@@ -259,29 +259,6 @@ const VoiceInputSection: React.FC = () => {
                 ))}
               </AionSelect>
             </Form.Item>
-
-            {isDeepgram && (
-              <>
-                <Form.Item label={<FieldLabel labelKey='settings.speechToTextDetectLanguage' requirement='optional' />}>
-                  <Switch
-                    checked={config.deepgram?.detectLanguage !== false}
-                    onChange={(checked) => handleDeepgramChange('detectLanguage', checked)}
-                  />
-                </Form.Item>
-                <Form.Item label={<FieldLabel labelKey='settings.speechToTextPunctuate' requirement='optional' />}>
-                  <Switch
-                    checked={config.deepgram?.punctuate !== false}
-                    onChange={(checked) => handleDeepgramChange('punctuate', checked)}
-                  />
-                </Form.Item>
-                <Form.Item label={<FieldLabel labelKey='settings.speechToTextSmartFormat' requirement='optional' />}>
-                  <Switch
-                    checked={config.deepgram?.smartFormat !== false}
-                    onChange={(checked) => handleDeepgramChange('smartFormat', checked)}
-                  />
-                </Form.Item>
-              </>
-            )}
           </Form>
           <SpeechTestPanel config={config} source={source} />
         </>

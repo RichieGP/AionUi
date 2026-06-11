@@ -128,7 +128,7 @@ describe('VoiceInputSection', () => {
     await waitFor(() => expect(screen.getByText('中文（简体）')).toBeTruthy());
   });
 
-  it('deepgram mode shows formatting switches', async () => {
+  it('deepgram mode hides the batch-only/always-on formatting switches', async () => {
     configStore.value = {
       enabled: true,
       provider: 'deepgram',
@@ -142,7 +142,11 @@ describe('VoiceInputSection', () => {
       },
     };
     render(<VoiceInputSection />);
-    await waitFor(() => expect(screen.getByText('settings.speechToTextPunctuate')).toBeTruthy());
+    await waitFor(() => expect(screen.getByText('settings.speechToTextLanguage')).toBeTruthy());
     expect(screen.queryByText('settings.speechToTextBaseUrl')).toBeNull();
+    // Stored values stay honored by the backend; only the toggles are gone.
+    expect(screen.queryByText('settings.speechToTextDetectLanguage')).toBeNull();
+    expect(screen.queryByText('settings.speechToTextPunctuate')).toBeNull();
+    expect(screen.queryByText('settings.speechToTextSmartFormat')).toBeNull();
   });
 });
