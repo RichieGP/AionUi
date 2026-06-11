@@ -5,8 +5,19 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { configService } from '@/common/config/configService';
+import type { SpeechToTextConfig } from '@/common/types/provider/speech';
 import { useLatestRef } from '@/renderer/hooks/ui/useLatestRef';
 import { transcribeAudioBlob } from '@/renderer/services/SpeechToTextService';
+import {
+  AudioWorkletUnavailableError,
+  createPcmRecorder,
+  encodeWavPcm16,
+  STREAM_SAMPLE_RATE,
+  type PcmRecorderHandle,
+} from '@/renderer/services/speech/pcmRecorder';
+import { startSpeechStream, type SpeechStreamHandle } from '@/renderer/services/speech/SpeechStreamClient';
+import { rememberStreamUnsupported, shouldTryStreaming } from '@/renderer/services/speech/speechStreamPolicy';
 import { isElectronDesktop } from '@/renderer/utils/platform';
 
 export type SpeechInputAvailability = 'record' | 'file' | 'unsupported';
@@ -34,7 +45,24 @@ type SpeechInputEnvironment = {
 
 type UseSpeechInputOptions = {
   locale?: string;
+  /**
+   * Live transcript of the current STREAMING session (finals + trailing
+   * partial). Called with `null` exactly once per streaming session to clear
+   * the live display, always before the terminal `onTranscript` or error.
+   * Never called on the non-streaming MediaRecorder path.
+   */
+  onLiveTranscript?: (sessionText: string | null) => void;
   onTranscript: (transcript: string) => void;
+};
+
+/** One active streaming transcription session (PCM recorder + WebSocket). */
+type StreamingSession = {
+  config: SpeechToTextConfig;
+  finals: string[];
+  partial: string;
+  recorder: PcmRecorderHandle;
+  handle: SpeechStreamHandle | null;
+  liveCleared: boolean;
 };
 
 const LOCAL_HOSTNAMES = new Set(['localhost', '127.0.0.1', '::1']);
@@ -67,6 +95,19 @@ export const appendSpeechTranscript = (base: string, transcript: string): string
   }
 
   return `${normalizedBase}\n${normalizedTranscript}`;
+};
+
+/**
+ * Compose the live display text for a streaming session: committed finals
+ * joined by newline, with the in-flight partial appended after a newline when
+ * finals exist (partial alone otherwise).
+ */
+export const composeLiveTranscript = (finals: string[], partial: string): string => {
+  const joined = finals.join('\n');
+  if (!partial) {
+    return joined;
+  }
+  return joined ? `${joined}\n${partial}` : partial;
 };
 
 export const getSpeechInputErrorMessageKey = (errorCode: SpeechInputErrorCode): string => {
@@ -188,7 +229,7 @@ const mapSpeechInputError = (error: unknown): SpeechInputErrorCode => {
   return 'unknown';
 };
 
-export const useSpeechInput = ({ locale, onTranscript }: UseSpeechInputOptions) => {
+export const useSpeechInput = ({ locale, onLiveTranscript, onTranscript }: UseSpeechInputOptions) => {
   const [status, setStatus] = useState<SpeechInputStatus>('idle');
   const [errorCode, setErrorCode] = useState<SpeechInputErrorCode | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -204,6 +245,8 @@ export const useSpeechInput = ({ locale, onTranscript }: UseSpeechInputOptions) 
   const mediaSourceRef = useRef<MediaStreamAudioSourceNode | null>(null);
   const analyserDataRef = useRef<Uint8Array<ArrayBuffer> | null>(null);
   const onTranscriptRef = useLatestRef(onTranscript);
+  const onLiveTranscriptRef = useLatestRef(onLiveTranscript);
+  const streamSessionRef = useRef<StreamingSession | null>(null);
   const availability = useMemo(() => getSpeechInputAvailability(), []);
 
   const recognitionLocale = locale?.trim() || 'en-US';
@@ -359,11 +402,198 @@ export const useSpeechInput = ({ locale, onTranscript }: UseSpeechInputOptions) 
     [onTranscriptRef, recognitionLocale, resetSpeechVisualizer]
   );
 
+  const emitLiveTranscript = useCallback(
+    (session: StreamingSession) => {
+      onLiveTranscriptRef.current?.(composeLiveTranscript(session.finals, session.partial));
+    },
+    [onLiveTranscriptRef]
+  );
+
+  /** Clear the live display exactly once, always before terminal onTranscript/error. */
+  const clearLiveTranscript = useCallback(
+    (session: StreamingSession) => {
+      if (session.liveCleared) {
+        return;
+      }
+      session.liveCleared = true;
+      onLiveTranscriptRef.current?.(null);
+    },
+    [onLiveTranscriptRef]
+  );
+
+  /** Detach the session from the hook and stop visualizer/analyser wiring. */
+  const teardownStreamingSession = useCallback(
+    (session: StreamingSession) => {
+      if (streamSessionRef.current === session) {
+        streamSessionRef.current = null;
+      }
+      pauseSpeechVisualizer();
+      void cleanupAudioAnalysis();
+    },
+    [cleanupAudioAnalysis, pauseSpeechVisualizer]
+  );
+
+  const finishStreamingSession = useCallback(
+    (session: StreamingSession) => {
+      teardownStreamingSession(session);
+      // Idempotent: returns the existing stop promise when already stopped.
+      void session.recorder.stop();
+      clearLiveTranscript(session);
+
+      const transcript = session.finals.join('\n').trim();
+      if (!transcript) {
+        setErrorCode('empty-transcript');
+        setErrorMessage(null);
+        setStatus('error');
+        resetSpeechVisualizer();
+        return;
+      }
+
+      onTranscriptRef.current(transcript);
+      setStatus('idle');
+      resetSpeechVisualizer();
+    },
+    [clearLiveTranscript, onTranscriptRef, resetSpeechVisualizer, teardownStreamingSession]
+  );
+
+  /**
+   * Streaming failed (server error, interruption, timeout): replay the PCM
+   * captured so far through the whole-blob /api/stt fallback so the user's
+   * recording is never lost.
+   */
+  const fallbackStreamingSession = useCallback(
+    async (session: StreamingSession, code: string) => {
+      teardownStreamingSession(session);
+      if (code === 'STT_STREAM_UNSUPPORTED') {
+        rememberStreamUnsupported(session.config);
+      }
+      session.handle?.abort();
+      clearLiveTranscript(session);
+      setStatus('transcribing');
+
+      try {
+        const { pcm } = await session.recorder.stop();
+        await transcribeBlob(encodeWavPcm16(pcm, STREAM_SAMPLE_RATE, 1));
+      } catch (error) {
+        setErrorCode(mapSpeechInputError(error));
+        setErrorMessage(null);
+        setStatus('error');
+        resetSpeechVisualizer();
+      }
+    },
+    [clearLiveTranscript, resetSpeechVisualizer, teardownStreamingSession, transcribeBlob]
+  );
+
+  /**
+   * Try to start a streaming session. Returns true when the attempt was
+   * handled (session running or error surfaced); false when the environment
+   * lacks AudioWorklet support and the caller should fall back to the
+   * MediaRecorder path for this session (environment, not config — no memory).
+   */
+  const startStreamingSession = useCallback(
+    async (config: SpeechToTextConfig): Promise<boolean> => {
+      let handle: SpeechStreamHandle | null = null;
+      const earlyChunks: Uint8Array[] = [];
+      let recorder: PcmRecorderHandle;
+
+      try {
+        recorder = await createPcmRecorder({
+          onChunk: (chunk) => {
+            if (handle) {
+              handle.sendChunk(chunk);
+            } else {
+              earlyChunks.push(chunk);
+            }
+          },
+        });
+      } catch (error) {
+        if (error instanceof AudioWorkletUnavailableError) {
+          return false;
+        }
+        // getUserMedia/AudioContext failures would also fail the MediaRecorder
+        // path — surface them directly instead of retrying.
+        setErrorCode(mapSpeechInputError(error));
+        setErrorMessage(null);
+        setStatus('error');
+        resetSpeechVisualizer();
+        return true;
+      }
+
+      const session: StreamingSession = {
+        config,
+        finals: [],
+        partial: '',
+        recorder,
+        handle: null,
+        liveCleared: false,
+      };
+      const isActive = () => streamSessionRef.current === session;
+
+      handle = startSpeechStream({
+        languageHint: recognitionLocale,
+        callbacks: {
+          onReady: () => {
+            // Chunk buffering/flushing is handled inside the stream client.
+          },
+          onPartial: (text) => {
+            if (!isActive()) return;
+            session.partial = text;
+            emitLiveTranscript(session);
+          },
+          onFinal: (text) => {
+            if (!isActive()) return;
+            session.partial = '';
+            if (text.trim()) {
+              session.finals.push(text);
+            }
+            emitLiveTranscript(session);
+          },
+          onDone: () => {
+            if (!isActive()) return;
+            finishStreamingSession(session);
+          },
+          onError: (code) => {
+            if (!isActive()) return;
+            void fallbackStreamingSession(session, code);
+          },
+        },
+      });
+      session.handle = handle;
+      streamSessionRef.current = session;
+      for (const chunk of earlyChunks.splice(0)) {
+        handle.sendChunk(chunk);
+      }
+
+      setErrorCode(null);
+      setErrorMessage(null);
+      setStatus('recording');
+      await startSpeechVisualizer(recorder.stream);
+      return true;
+    },
+    [
+      emitLiveTranscript,
+      fallbackStreamingSession,
+      finishStreamingSession,
+      recognitionLocale,
+      resetSpeechVisualizer,
+      startSpeechVisualizer,
+    ]
+  );
+
   const startRecording = useCallback(async () => {
     if (availability !== 'record') {
       setErrorCode('recording-unsupported');
       setStatus('error');
       return;
+    }
+
+    const speechConfig = configService.get('tools.speechToText');
+    if (speechConfig && shouldTryStreaming(speechConfig)) {
+      const handled = await startStreamingSession(speechConfig);
+      if (handled) {
+        return;
+      }
+      // AudioWorklet unavailable — use the MediaRecorder path for this session.
     }
 
     try {
@@ -407,17 +637,38 @@ export const useSpeechInput = ({ locale, onTranscript }: UseSpeechInputOptions) 
       setStatus('error');
       resetSpeechVisualizer();
     }
-  }, [availability, cleanupRecorder, resetSpeechVisualizer, startSpeechVisualizer, transcribeBlob]);
+  }, [
+    availability,
+    cleanupRecorder,
+    resetSpeechVisualizer,
+    startSpeechVisualizer,
+    startStreamingSession,
+    transcribeBlob,
+  ]);
 
   const stopRecording = useCallback(() => {
+    if (status !== 'recording') {
+      return;
+    }
+
+    const session = streamSessionRef.current;
+    if (session) {
+      setStatus('transcribing');
+      pauseSpeechVisualizer();
+      // Keep the accumulated PCM (resolved by this stop) for potential fallback.
+      void session.recorder.stop();
+      session.handle?.stop();
+      return;
+    }
+
     const recorder = recorderRef.current;
-    if (!recorder || status !== 'recording') {
+    if (!recorder) {
       return;
     }
 
     setStatus('transcribing');
     recorder.stop();
-  }, [status]);
+  }, [pauseSpeechVisualizer, status]);
 
   const transcribeFile = useCallback(
     async (file: Blob) => {
@@ -428,6 +679,12 @@ export const useSpeechInput = ({ locale, onTranscript }: UseSpeechInputOptions) 
 
   useEffect(() => {
     return () => {
+      const session = streamSessionRef.current;
+      if (session) {
+        streamSessionRef.current = null;
+        session.handle?.abort();
+        void session.recorder.stop();
+      }
       const recorder = recorderRef.current;
       if (recorder) {
         recorder.ondataavailable = null;
