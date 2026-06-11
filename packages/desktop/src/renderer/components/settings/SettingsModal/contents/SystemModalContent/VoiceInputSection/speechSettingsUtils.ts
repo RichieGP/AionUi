@@ -5,13 +5,10 @@
  */
 
 import type { SpeechToTextConfig } from '@/common/types/provider/speech';
+export { DEEPGRAM_SPEECH_MODEL_PRESETS, OPENAI_SPEECH_MODEL_PRESETS } from '@renderer/services/speech/speechModels';
 
 /** UI-level service source. 'custom' is stored as provider:'openai' + non-empty base_url. */
 export type SpeechSource = 'openai' | 'deepgram' | 'custom';
-
-/** Phase 1 only lists models valid for the file-based /audio/transcriptions endpoint. */
-export const OPENAI_SPEECH_MODEL_PRESETS = ['gpt-4o-transcribe', 'gpt-4o-mini-transcribe', 'whisper-1'];
-export const DEEPGRAM_SPEECH_MODEL_PRESETS = ['nova-3', 'nova-2'];
 
 /** Language autonyms are intentionally not translated. Empty value = auto detect. */
 export const SPEECH_LANGUAGE_OPTIONS: Array<{ value: string; label?: string }> = [
