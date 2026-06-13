@@ -90,12 +90,13 @@ const GuidPage: React.FC = () => {
     void ensureBackendMcpCatalog()
       .then(({ allServers }) => {
         setAvailableMcpServers(allServers);
-        setGuidSelectedMcpServerIds((prev) => prev ?? []);
+        setGuidSelectedMcpServerIds(
+          (prev) => prev ?? allServers.filter((server) => server.enabled).map((server) => server.id)
+        );
       })
       .catch((error) => {
         console.error('[GuidPage] Failed to load MCP catalog:', error);
         setAvailableMcpServers([]);
-        setGuidSelectedMcpServerIds((prev) => prev ?? []);
       });
   }, []);
 

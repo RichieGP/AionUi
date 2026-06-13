@@ -141,16 +141,22 @@ export const useGuidSend = (deps: GuidSendDeps): GuidSendResult => {
         ? guidEnabledSkills
         : undefined;
     const excludeBuiltinSkills = guidDisabledBuiltinSkills ?? resolveDisabledBuiltinSkills(agentInfo);
-    const selectedMcpServerIdSet = new Set(selectedMcpServerIds ?? []);
-    const selectedUserMcpServerIds = availableMcpServers
-      .filter((server) => selectedMcpServerIdSet.has(server.id) && server.builtin !== true)
-      .map((server) => server.id);
-    const selectedAllSessionMcpServers = availableMcpServers
-      .filter((server) => selectedMcpServerIdSet.has(server.id))
-      .map((server) => toSessionMcpServer(server));
-    const selectedSessionMcpServers = availableMcpServers
-      .filter((server) => selectedMcpServerIdSet.has(server.id) && server.builtin === true)
-      .map((server) => toSessionMcpServer(server));
+    const selectedMcpServerIdSet = selectedMcpServerIds ? new Set(selectedMcpServerIds) : undefined;
+    const selectedUserMcpServerIds = selectedMcpServerIdSet
+      ? availableMcpServers
+          .filter((server) => selectedMcpServerIdSet.has(server.id) && server.builtin !== true)
+          .map((server) => server.id)
+      : undefined;
+    const selectedAllSessionMcpServers = selectedMcpServerIdSet
+      ? availableMcpServers
+          .filter((server) => selectedMcpServerIdSet.has(server.id))
+          .map((server) => toSessionMcpServer(server))
+      : undefined;
+    const selectedSessionMcpServers = selectedMcpServerIdSet
+      ? availableMcpServers
+          .filter((server) => selectedMcpServerIdSet.has(server.id) && server.builtin === true)
+          .map((server) => toSessionMcpServer(server))
+      : undefined;
 
     const finalEffectiveAgentType = effectiveAgentType;
 
