@@ -1,0 +1,78 @@
+.machineRail {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  position: relative;
+}
+
+.machineNode {
+  min-height: 82px;
+  border: 1px solid rgb(var(--border-2));
+  border-radius: 8px;
+  background: rgb(var(--bg-1));
+  padding: 10px;
+}
+
+.machineNodeSource {
+  border-color: rgb(var(--primary-6));
+  background: rgba(var(--primary-1), 0.42);
+}
+
+.machineNodeUnavailable {
+  opacity: 0.58;
+}
+
+.flowLine {
+  height: 2px;
+  min-width: 42px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, rgba(var(--primary-6), 0.2), rgb(var(--primary-6)), rgba(var(--primary-6), 0.2));
+  background-size: 200% 100%;
+  animation: gitkeeperFlow 1.2s linear infinite;
+}
+
+.repoCard {
+  border: 1px solid rgb(var(--border-2));
+  border-radius: 8px;
+  background: rgb(var(--bg-1));
+  overflow: hidden;
+}
+
+.repoCardHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 12px;
+  border-bottom: 1px solid rgb(var(--border-1));
+}
+
+.repoCardBody {
+  padding: 10px 12px;
+}
+
+.fileList {
+  max-height: 140px;
+  overflow: auto;
+  border: 1px solid rgb(var(--border-1));
+  border-radius: 6px;
+}
+
+.fileRow {
+  padding: 5px 8px;
+  border-bottom: 1px solid rgb(var(--border-1));
+}
+
+.fileRow:last-child {
+  border-bottom: 0;
+}
+
+@keyframes gitkeeperFlow {
+  from {
+    background-position: 0 0;
+  }
+
+  to {
+    background-position: 200% 0;
+  }
+}

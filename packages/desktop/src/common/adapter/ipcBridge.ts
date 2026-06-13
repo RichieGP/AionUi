@@ -684,6 +684,97 @@ export const fileSnapshot = {
   getBranches: httpPost<string[], { workspace: string }>('/api/fs/snapshot/branches'),
 };
 
+export type GitKeeperPopupMachine = {
+  machine: string;
+  role: 'source' | 'peer' | string;
+  available: boolean;
+  icon: 'apple_desktop' | 'apple_laptop' | string;
+  label: string;
+};
+
+export type GitKeeperPopupFlow = {
+  from: string;
+  to: string;
+  direction: string;
+  animated: boolean;
+  status: string;
+};
+
+export type GitKeeperPopupAction = {
+  order: number;
+  action: string;
+  summary: string;
+};
+
+export type GitKeeperPopupPeerState = {
+  machine: string;
+  available: boolean;
+  path: string;
+  status: string;
+};
+
+export type GitKeeperPopupRepoCard = {
+  repositoryId: string;
+  operationId: string;
+  status: string;
+  expandedByDefault: boolean;
+  dirtyFiles: string[];
+  selectedFiles: string[];
+  leftBehindFiles: string[];
+  blockers: string[];
+  warnings: string[];
+  recommendedActions: GitKeeperPopupAction[];
+  peerState: GitKeeperPopupPeerState[];
+  receiptLinks: string[];
+};
+
+export type GitKeeperPopupState = {
+  schemaVersion: number;
+  host: string;
+  operationGroupId: string;
+  threadId?: string;
+  generatedAt: string;
+  sourceMachine: string;
+  machines: GitKeeperPopupMachine[];
+  flows: GitKeeperPopupFlow[];
+  repoCards: GitKeeperPopupRepoCard[];
+  advisory: {
+    required: boolean;
+    showCodexCards: boolean;
+    showChat: boolean;
+    chatPlaceholder: string;
+    recommendationCards: Array<Record<string, unknown>>;
+  };
+  approval: {
+    required: boolean;
+    state: string;
+    grantRequiredForExecution: boolean;
+  };
+  automation: {
+    nonInteractive: boolean;
+    canAutoProceed: boolean;
+  };
+  progress: Array<{ order: number; phase: string; status: string; summary: string }>;
+  closeBehavior: {
+    closeWhenComplete: boolean;
+    deleteTemporaryCodexThread: boolean;
+  };
+};
+
+export type GitKeeperPopupStateRequest = {
+  workspace: string;
+  host?: 'kodo_aoin_workbench' | 'kodo_aoin_web' | 'automation' | 'macos_companion';
+  repositoryId?: string;
+  threadId?: string;
+  offlineMachines?: string[];
+};
+
+export const gitkeeper = {
+  getPopupState: bridge.buildProvider<IBridgeResponse<GitKeeperPopupState>, GitKeeperPopupStateRequest>(
+    'gitkeeper.get-popup-state'
+  ),
+};
+
 // ---------------------------------------------------------------------------
 // Google Auth — stubbed (Electron-native OAuth flow)
 // ---------------------------------------------------------------------------

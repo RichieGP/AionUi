@@ -354,6 +354,20 @@
       "noUnstaged": "Nenhuma alteração fora do stage",
       "noStaged": "Nenhuma alteração em stage"
     },
+    "gitkeeper": {
+      "title": "GitKeeper sync",
+      "open": "Open GitKeeper sync",
+      "refresh": "Refresh",
+      "dirtyFiles": "Dirty files",
+      "blockers": "Blockers",
+      "actions": "Actions",
+      "clean": "No dirty files detected",
+      "machineOnline": "online",
+      "machineOffline": "offline",
+      "advisoryRequired": "Codex advice is required before GitKeeper can reconcile this workspace.",
+      "loadFailed": "Failed to load GitKeeper state",
+      "empty": "No GitKeeper state available"
+    },
     "openWorkspace": "Abrir pasta do projeto",
     "openWith": {
       "vscode": "VS Code",

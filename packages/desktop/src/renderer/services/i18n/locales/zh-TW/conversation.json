@@ -348,6 +348,20 @@
       "noUnstaged": "沒有未暫存的變更",
       "noStaged": "沒有已暫存的變更"
     },
+    "gitkeeper": {
+      "title": "GitKeeper sync",
+      "open": "Open GitKeeper sync",
+      "refresh": "Refresh",
+      "dirtyFiles": "Dirty files",
+      "blockers": "Blockers",
+      "actions": "Actions",
+      "clean": "No dirty files detected",
+      "machineOnline": "online",
+      "machineOffline": "offline",
+      "advisoryRequired": "Codex advice is required before GitKeeper can reconcile this workspace.",
+      "loadFailed": "Failed to load GitKeeper state",
+      "empty": "No GitKeeper state available"
+    },
     "openWorkspace": "開啟專案資料夾",
     "openWith": {
       "vscode": "VS Code",

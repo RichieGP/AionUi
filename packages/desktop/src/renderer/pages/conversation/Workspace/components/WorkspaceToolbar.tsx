@@ -12,6 +12,7 @@ import React from 'react';
 import UploadProgressBar from '@/renderer/components/media/UploadProgressBar';
 import type { TFunction } from 'i18next';
 import type { RefInputType } from '@arco-design/web-react/es/Input/interface';
+import GitKeeperPopup from './GitKeeperPopup';
 
 type WorkspaceToolbarProps = {
   t: TFunction;
@@ -27,6 +28,8 @@ type WorkspaceToolbarProps = {
   // Tree state
   loading: boolean;
   refreshWorkspace: () => void;
+  workspace: string;
+  conversationId: string;
   // Upload
   handleSelectHostFiles: () => void;
   handleUploadDeviceFiles: () => void;
@@ -46,6 +49,8 @@ const WorkspaceToolbar: React.FC<WorkspaceToolbarProps> = ({
   searchInputRef,
   loading,
   refreshWorkspace,
+  workspace,
+  conversationId,
   handleSelectHostFiles,
   handleUploadDeviceFiles,
   setShowHostFileSelector,
@@ -136,6 +141,7 @@ const WorkspaceToolbar: React.FC<WorkspaceToolbarProps> = ({
               />
             </span>
           </Tooltip>
+          <GitKeeperPopup workspace={workspace} conversationId={conversationId} />
         </div>
       </div>
       <UploadProgressBar source='workspace' />
