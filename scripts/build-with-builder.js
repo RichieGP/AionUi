@@ -10,8 +10,9 @@
  * - Packaging only: use --pack-only to skip electron-builder distributable creation
  */
 
-const { execSync, spawnSync } = require('child_process');
+const { execFileSync, execSync, spawnSync } = require('child_process');
 const fs = require('fs');
+const os = require('os');
 const path = require('path');
 const crypto = require('crypto');
 
@@ -212,6 +213,44 @@ function killWindowsProcesses(imageNames) {
 
 function formatExecError(error) {
   return [error?.message, error?.stdout?.toString?.(), error?.stderr?.toString?.()].filter(Boolean).join('\n').trim();
+}
+
+function shouldRunAioncoreDbCompatibilityCheck() {
+  if (process.env.AIONUI_SKIP_AIONCORE_DB_COMPAT === '1') return false;
+  if (process.env.AIONUI_COMPAT_DATA_DIR || process.env.AIONUI_AIONCORE_COMPAT_DATA_DIR) return true;
+  return localMacBuild;
+}
+
+function runAioncoreDbCompatibilityCheck({ projectRoot, targetArch, appVersion }) {
+  if (!shouldRunAioncoreDbCompatibilityCheck()) {
+    console.log('🧪 AionCore DB compatibility check skipped');
+    return;
+  }
+
+  const binaryName = process.platform === 'win32' ? 'aioncore.exe' : 'aioncore';
+  const binaryPath = path.join(projectRoot, 'resources', 'bundled-aioncore', `${process.platform}-${targetArch}`, binaryName);
+  const dataDir =
+    process.env.AIONUI_COMPAT_DATA_DIR ||
+    process.env.AIONUI_AIONCORE_COMPAT_DATA_DIR ||
+    path.join(os.homedir(), '.aionui');
+
+  console.log(`🧪 Verifying bundled AionCore DB compatibility against ${dataDir}`);
+  execFileSync(
+    process.execPath,
+    [
+      path.join(projectRoot, 'scripts', 'verifyAioncoreDbCompatibility.js'),
+      '--binary',
+      binaryPath,
+      '--data-dir',
+      dataDir,
+      '--app-version',
+      appVersion,
+    ],
+    {
+      stdio: 'inherit',
+      env: process.env,
+    }
+  );
 }
 
 // Create DMG using electron-builder --prepackaged with .app path
@@ -475,6 +514,7 @@ try {
     arch: targetArch,
     version: resolveAioncoreVersion(projectRoot),
   });
+  runAioncoreDbCompatibilityCheck({ projectRoot, targetArch, appVersion: packageJson.version });
 
   // 6. Prepare hub resources (index.json + extension zips for offline fallback)
   execSync('node scripts/prepareHubResources.js', { stdio: 'inherit', env: process.env });

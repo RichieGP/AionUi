@@ -96,6 +96,28 @@ npm run dist:win
 npm run dist:linux
 ```
 
+### AionCore database compatibility guard
+
+Local macOS builds verify that the bundled `aioncore` binary can open a copy of the current Aion data directory before packaging continues. This catches the failure mode where the app rebuild downloads the pinned stock AionCore release, but the local SQLite database already has newer migrations applied.
+
+Use a local compatible Core build when developing against unreleased migrations:
+
+```bash
+AIONUI_LOCAL_AIONCORE_PATH=/path/to/alfred-aion-core/target/release/aioncore npm run dist:mac
+```
+
+Useful overrides:
+
+```bash
+# Check a non-default Aion data directory
+AIONUI_COMPAT_DATA_DIR=/path/to/.aionui npm run dist:mac
+
+# Emergency bypass only; can produce an app that fails on launch
+AIONUI_SKIP_AIONCORE_DB_COMPAT=1 npm run dist:mac
+```
+
+The guard uses a copied database and waits for `AIONCORE_LISTENING`, so the packaged Core must prove migration compatibility rather than merely reporting the expected version string.
+
 ### Manual native module rebuild
 
 ```javascript
