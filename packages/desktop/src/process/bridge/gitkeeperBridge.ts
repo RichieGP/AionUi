@@ -67,6 +67,8 @@ async function buildPopupState(request: GitKeeperPopupStateRequest): Promise<Git
     request.host ?? 'kodo_aoin_workbench',
     '--repository-id',
     repositoryId,
+    '--repo-path',
+    request.workspace,
     '--source-machine',
     sourceMachine,
   ];
