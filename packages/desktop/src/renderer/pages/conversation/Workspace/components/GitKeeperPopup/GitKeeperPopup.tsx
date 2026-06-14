@@ -67,6 +67,27 @@ function blockerSummary(blocker: string): string {
   return blocker.replaceAll('_', ' ');
 }
 
+function fallbackDirtClassification(card: GitKeeperPopupRepoCard): NonNullable<GitKeeperPopupRepoCard['dirtClassification']> {
+  const files = [...new Set([...card.dirtyFiles, ...card.leftBehindFiles])];
+  return {
+    totalFiles: files.length,
+    displayMode: files.length === 0 ? 'clean' : files.length <= 3 ? 'individual' : 'grouped',
+    summary: files.length === 0 ? 'No dirty files detected.' : `${files.length} dirty file(s) require review.`,
+    groups: files.length === 0
+      ? []
+      : [{
+          id: 'dirty',
+          kind: 'mixed',
+          title: files.length <= 3 ? 'Dirty files' : 'Changed files',
+          summary: files.length <= 3 ? files.join(', ') : `${files.length} dirty files changed.`,
+          recommendation: 'Review before syncing.',
+          files,
+          displayMode: files.length <= 3 ? 'individual' : 'grouped',
+          summarizer: 'deterministic',
+        }],
+  };
+}
+
 const MachineNode: React.FC<{ machine: GitKeeperPopupMachine }> = ({ machine }) => {
   const { t } = useTranslation();
 
@@ -135,6 +156,7 @@ const RepoCard: React.FC<{
   const blocked = card.blockers.length > 0 || card.status === 'blocked';
   const canSync = Boolean(approvedCard) || (dirtyCount === 0 && card.blockers.length === 0);
   const visibleApprovedFiles = new Set([...(card.selectedFiles ?? []), ...(approvedCard?.approvedFiles ?? [])]);
+  const dirtClassification = card.dirtClassification ?? fallbackDirtClassification(card);
 
   return (
     <div className={styles.repoCard}>
@@ -170,20 +192,38 @@ const RepoCard: React.FC<{
           </div>
         </div>
 
-        {card.dirtyFiles.length > 0 || card.leftBehindFiles.length > 0 ? (
-          <div className={`${styles.fileList} mb-10px`}>
-            {[...new Set([...card.dirtyFiles, ...card.leftBehindFiles])].map((file) => (
-              <div key={file} className={styles.fileRow}>
-                <span className='text-12px text-t-secondary font-mono overflow-hidden text-ellipsis whitespace-nowrap'>
-                  {file}
-                </span>
-                <Tag size='small' color={visibleApprovedFiles.has(file) ? 'green' : 'orange'}>
-                  {visibleApprovedFiles.has(file)
-                    ? t('conversation.workspace.gitkeeper.approved')
-                    : t('conversation.workspace.gitkeeper.needsApproval')}
-                </Tag>
-              </div>
-            ))}
+        {dirtClassification.displayMode !== 'clean' ? (
+          <div className='mb-10px'>
+            <div className='text-12px text-t-secondary mb-6px'>{dirtClassification.summary}</div>
+            <div className={styles.fileList}>
+              {dirtClassification.displayMode === 'individual'
+                ? dirtClassification.groups.flatMap((group) => group.files).map((file) => (
+                    <div key={file} className={styles.fileRow}>
+                      <span className='text-12px text-t-secondary font-mono overflow-hidden text-ellipsis whitespace-nowrap'>
+                        {file}
+                      </span>
+                      <Tag size='small' color={visibleApprovedFiles.has(file) ? 'green' : 'orange'}>
+                        {visibleApprovedFiles.has(file)
+                          ? t('conversation.workspace.gitkeeper.approved')
+                          : t('conversation.workspace.gitkeeper.needsApproval')}
+                      </Tag>
+                    </div>
+                  ))
+                : dirtClassification.groups.map((group) => (
+                    <div key={group.id} className={styles.dirtGroupRow}>
+                      <div className='min-w-0'>
+                        <div className='flex items-center gap-6px mb-3px'>
+                          <span className='text-12px font-semibold text-t-primary'>{group.title}</span>
+                          <Tag size='small' color={group.summarizer === 'codex_pending' ? 'orange' : 'blue'}>
+                            {group.files.length}
+                          </Tag>
+                        </div>
+                        <div className='text-12px text-t-secondary'>{group.summary}</div>
+                        <div className='text-11px text-t-tertiary mt-3px'>{group.recommendation}</div>
+                      </div>
+                    </div>
+                  ))}
+            </div>
           </div>
         ) : (
           <div className='flex items-center gap-6px text-12px text-success-6 mb-10px'>

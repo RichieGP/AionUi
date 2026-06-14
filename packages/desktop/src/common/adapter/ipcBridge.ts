@@ -721,6 +721,21 @@ export type GitKeeperPopupRepoCard = {
   dirtyFiles: string[];
   selectedFiles: string[];
   leftBehindFiles: string[];
+  dirtClassification?: {
+    totalFiles: number;
+    displayMode: 'individual' | 'grouped' | 'clean' | string;
+    summary: string;
+    groups: Array<{
+      id: string;
+      kind: string;
+      title: string;
+      summary: string;
+      recommendation: string;
+      files: string[];
+      displayMode: 'individual' | 'grouped' | string;
+      summarizer: 'deterministic' | 'codex_pending' | string;
+    }>;
+  };
   blockers: string[];
   warnings: string[];
   recommendedActions: GitKeeperPopupAction[];

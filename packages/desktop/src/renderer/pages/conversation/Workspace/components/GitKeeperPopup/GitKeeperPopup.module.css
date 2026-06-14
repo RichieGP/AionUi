@@ -122,6 +122,15 @@
   border-bottom: 0;
 }
 
+.dirtGroupRow {
+  padding: 8px 10px;
+  border-bottom: 1px solid rgb(var(--border-1));
+}
+
+.dirtGroupRow:last-child {
+  border-bottom: 0;
+}
+
 .repoActionBar {
   display: flex;
   align-items: center;
