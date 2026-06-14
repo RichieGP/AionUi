@@ -789,6 +789,18 @@ export type GitKeeperAdvisoryResponse = {
   answer: string;
 };
 
+export type GitKeeperExecuteApprovedPlanRequest = {
+  workspace: string;
+  sourceMachine: string;
+  threadId?: string;
+  cards: GitKeeperAdvisoryResponse['cards'];
+};
+
+export type GitKeeperExecuteApprovedPlanResponse = {
+  status: 'executed' | 'blocked' | 'failed' | string;
+  results: Array<Record<string, unknown>>;
+};
+
 export const gitkeeper = {
   getPopupState: bridge.buildProvider<IBridgeResponse<GitKeeperPopupState>, GitKeeperPopupStateRequest>(
     'gitkeeper.get-popup-state'
@@ -796,6 +808,10 @@ export const gitkeeper = {
   getAdvisory: bridge.buildProvider<IBridgeResponse<GitKeeperAdvisoryResponse>, GitKeeperAdvisoryRequest>(
     'gitkeeper.get-advisory'
   ),
+  executeApprovedPlan: bridge.buildProvider<
+    IBridgeResponse<GitKeeperExecuteApprovedPlanResponse>,
+    GitKeeperExecuteApprovedPlanRequest
+  >('gitkeeper.execute-approved-plan'),
 };
 
 // ---------------------------------------------------------------------------

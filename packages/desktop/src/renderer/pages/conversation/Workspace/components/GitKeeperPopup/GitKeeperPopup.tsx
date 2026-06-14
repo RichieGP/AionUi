@@ -102,11 +102,17 @@ const MachineFlowRail: React.FC<{ state: GitKeeperPopupState }> = ({ state }) =>
   );
 };
 
-const RepoCard: React.FC<{ card: GitKeeperPopupRepoCard }> = ({ card }) => {
+const RepoCard: React.FC<{
+  card: GitKeeperPopupRepoCard;
+  approvedCard?: GitKeeperAdvisoryResponse['cards'][number];
+  executing: boolean;
+  onSync: (card: GitKeeperPopupRepoCard) => void;
+}> = ({ card, approvedCard, executing, onSync }) => {
   const { t } = useTranslation();
   const dirtyCount = card.dirtyFiles.length + card.leftBehindFiles.length;
   const blocked = card.blockers.length > 0 || card.status === 'blocked';
-  const canSync = card.status === 'ready' && card.blockers.length === 0;
+  const canSync = Boolean(approvedCard) || (dirtyCount === 0 && card.status === 'ready' && card.blockers.length === 0);
+  const visibleApprovedFiles = new Set([...(card.selectedFiles ?? []), ...(approvedCard?.approvedFiles ?? [])]);
 
   return (
     <div className={styles.repoCard}>
@@ -149,8 +155,8 @@ const RepoCard: React.FC<{ card: GitKeeperPopupRepoCard }> = ({ card }) => {
                 <span className='text-12px text-t-secondary font-mono overflow-hidden text-ellipsis whitespace-nowrap'>
                   {file}
                 </span>
-                <Tag size='small' color={card.selectedFiles.includes(file) ? 'green' : 'orange'}>
-                  {card.selectedFiles.includes(file)
+                <Tag size='small' color={visibleApprovedFiles.has(file) ? 'green' : 'orange'}>
+                  {visibleApprovedFiles.has(file)
                     ? t('conversation.workspace.gitkeeper.approved')
                     : t('conversation.workspace.gitkeeper.needsApproval')}
                 </Tag>
@@ -203,11 +209,13 @@ const RepoCard: React.FC<{ card: GitKeeperPopupRepoCard }> = ({ card }) => {
 
         <div className={styles.repoActionBar}>
           <div className='text-12px text-t-secondary'>
-            {canSync
+            {approvedCard
+              ? t('conversation.workspace.gitkeeper.approvedPlanReady')
+              : canSync
               ? t('conversation.workspace.gitkeeper.readyToSync')
               : t('conversation.workspace.gitkeeper.syncBlockedHint')}
           </div>
-          <Button size='small' type='primary' disabled={!canSync}>
+          <Button size='small' type='primary' loading={executing} disabled={!canSync || executing} onClick={() => onSync(card)}>
             {t('conversation.workspace.gitkeeper.syncNow')}
           </Button>
         </div>
@@ -216,7 +224,12 @@ const RepoCard: React.FC<{ card: GitKeeperPopupRepoCard }> = ({ card }) => {
   );
 };
 
-const PopupBody: React.FC<{ state: GitKeeperPopupState }> = ({ state }) => {
+const PopupBody: React.FC<{
+  state: GitKeeperPopupState;
+  approvedCards: GitKeeperAdvisoryResponse['cards'];
+  executing: boolean;
+  onSync: (card: GitKeeperPopupRepoCard) => void;
+}> = ({ state, approvedCards, executing, onSync }) => {
   const { t } = useTranslation();
 
   return (
@@ -225,7 +238,13 @@ const PopupBody: React.FC<{ state: GitKeeperPopupState }> = ({ state }) => {
 
       <div className='flex flex-col gap-10px'>
         {state.repoCards.map((card) => (
-          <RepoCard key={card.operationId} card={card} />
+          <RepoCard
+            key={card.operationId}
+            card={card}
+            approvedCard={approvedCards.find((approved) => approved.repositoryId === card.repositoryId)}
+            executing={executing}
+            onSync={onSync}
+          />
         ))}
       </div>
 
@@ -240,10 +259,12 @@ const AdvisoryPanel: React.FC<{
   advisory: GitKeeperAdvisoryResponse | null;
   loading: boolean;
   error: string | null;
+  approved: boolean;
   question: string;
   onQuestionChange: (value: string) => void;
   onSend: () => void;
-}> = ({ advisory, loading, error, question, onQuestionChange, onSend }) => {
+  onApprove: () => void;
+}> = ({ advisory, loading, error, approved, question, onQuestionChange, onSend, onApprove }) => {
   const { t } = useTranslation();
 
   return (
@@ -285,6 +306,21 @@ const AdvisoryPanel: React.FC<{
 
       {advisory?.answer && <div className={styles.codexAnswer}>{advisory.answer}</div>}
 
+      {advisory && advisory.cards.length > 0 && (
+        <div className={styles.approvalRow}>
+          <div className='text-12px text-t-secondary'>
+            {approved
+              ? t('conversation.workspace.gitkeeper.planApproved')
+              : t('conversation.workspace.gitkeeper.planApprovalHint')}
+          </div>
+          <Button type='primary' size='small' disabled={approved || loading} onClick={onApprove}>
+            {approved
+              ? t('conversation.workspace.gitkeeper.planApprovedButton')
+              : t('conversation.workspace.gitkeeper.approvePlan')}
+          </Button>
+        </div>
+      )}
+
       <div className={styles.chatRow}>
         <Input.TextArea
           autoSize={{ minRows: 1, maxRows: 3 }}
@@ -310,6 +346,8 @@ const GitKeeperPopup: React.FC<GitKeeperPopupProps> = ({ workspace, conversation
   const [advisoryLoading, setAdvisoryLoading] = useState(false);
   const [advisoryError, setAdvisoryError] = useState<string | null>(null);
   const [advisoryQuestion, setAdvisoryQuestion] = useState('');
+  const [approvedCards, setApprovedCards] = useState<GitKeeperAdvisoryResponse['cards']>([]);
+  const [executing, setExecuting] = useState(false);
 
   const needsAdvisory = useCallback((popupState: GitKeeperPopupState) => {
     return popupState.advisory.required || popupState.repoCards.some((card) => card.status !== 'ready' || card.blockers.length > 0);
@@ -354,6 +392,7 @@ const GitKeeperPopup: React.FC<GitKeeperPopupProps> = ({ workspace, conversation
       setState(result.data);
       setAdvisory(null);
       setAdvisoryQuestion('');
+      setApprovedCards([]);
       if (needsAdvisory(result.data)) {
         void loadAdvisory(result.data);
       }
@@ -368,7 +407,49 @@ const GitKeeperPopup: React.FC<GitKeeperPopupProps> = ({ workspace, conversation
     if (!state || !advisoryQuestion.trim()) return;
     void loadAdvisory(state, advisoryQuestion.trim());
     setAdvisoryQuestion('');
+    setApprovedCards([]);
   }, [advisoryQuestion, loadAdvisory, state]);
+
+  const approveCurrentPlan = useCallback(() => {
+    if (!advisory) return;
+    setApprovedCards(advisory.cards);
+  }, [advisory]);
+
+  const executeApprovedPlan = useCallback(async (card: GitKeeperPopupRepoCard) => {
+    if (!state) return;
+    const approvedCard = approvedCards.find((item) => item.repositoryId === card.repositoryId);
+    const executionCards: GitKeeperAdvisoryResponse['cards'] = approvedCard
+      ? [approvedCard]
+      : [
+          {
+            repositoryId: card.repositoryId,
+            summary: 'Clean repo sync',
+            recommendation: 'Push current source branch and fast-forward peers.',
+            approvedFiles: [],
+            commitMessage: '',
+            risks: [],
+          },
+        ];
+    setExecuting(true);
+    setError(null);
+    try {
+      const result = await ipcBridge.gitkeeper.executeApprovedPlan.invoke({
+        workspace,
+        sourceMachine: state.sourceMachine,
+        threadId: conversationId,
+        cards: executionCards,
+      });
+      if (!result.success || !result.data) {
+        throw new Error(result.msg || t('conversation.workspace.gitkeeper.executeFailed'));
+      }
+      await loadPopupState();
+      setVisible(false);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setExecuting(false);
+    }
+  }, [approvedCards, conversationId, loadPopupState, state, t, workspace]);
 
   const openPopup = useCallback(() => {
     setVisible(true);
@@ -412,16 +493,23 @@ const GitKeeperPopup: React.FC<GitKeeperPopupProps> = ({ workspace, conversation
           <Alert type='error' content={error} />
         ) : state ? (
           <>
-            <PopupBody state={state} />
+            <PopupBody
+              state={state}
+              approvedCards={approvedCards}
+              executing={executing}
+              onSync={executeApprovedPlan}
+            />
             {needsAdvisory(state) && (
               <div className='mt-12px'>
                 <AdvisoryPanel
                   advisory={advisory}
                   loading={advisoryLoading}
                   error={advisoryError}
+                  approved={approvedCards.length > 0}
                   question={advisoryQuestion}
                   onQuestionChange={setAdvisoryQuestion}
                   onSend={sendAdvisoryQuestion}
+                  onApprove={approveCurrentPlan}
                 />
               </div>
             )}

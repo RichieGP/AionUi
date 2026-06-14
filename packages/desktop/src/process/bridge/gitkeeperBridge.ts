@@ -13,6 +13,8 @@ import { ipcBridge } from '@/common';
 import type {
   GitKeeperAdvisoryRequest,
   GitKeeperAdvisoryResponse,
+  GitKeeperExecuteApprovedPlanRequest,
+  GitKeeperExecuteApprovedPlanResponse,
   GitKeeperPopupState,
   GitKeeperPopupStateRequest,
 } from '@/common/adapter/ipcBridge';
@@ -143,6 +145,58 @@ async function buildAdvisory(request: GitKeeperAdvisoryRequest): Promise<GitKeep
   }
 }
 
+function operationIdFor(threadId: string | undefined, repositoryId: string): string {
+  const prefix = threadId?.trim() || 'aion-popup';
+  return `${prefix}-${repositoryId.replaceAll('/', '-')}`;
+}
+
+async function executeApprovedPlan(
+  request: GitKeeperExecuteApprovedPlanRequest
+): Promise<GitKeeperExecuteApprovedPlanResponse> {
+  if (!existsSync(GITKEEPER_CLI)) {
+    throw new Error('GitKeeper CLI is not built at the expected local path.');
+  }
+
+  const results: Array<Record<string, unknown>> = [];
+  const sourceMachine = normalizeMachineName(request.sourceMachine);
+
+  for (const card of request.cards) {
+    const args = [
+      GITKEEPER_CLI,
+      'repo',
+      'remote-propagate',
+      '--operation-id',
+      operationIdFor(request.threadId, card.repositoryId),
+      '--source-path',
+      request.workspace,
+      '--source-machine',
+      sourceMachine,
+      '--repository-id',
+      card.repositoryId,
+      '--execute',
+      '--json',
+    ];
+
+    if (card.commitMessage.trim()) {
+      args.push('--message', card.commitMessage);
+    }
+
+    for (const file of card.approvedFiles) {
+      args.push('--approve-path', file);
+    }
+
+    // Keep protected Git operations sequential so receipts and peer sync state stay ordered per repo.
+    // eslint-disable-next-line no-await-in-loop
+    const { stdout } = await execFileAsync(NODE_BIN, args, {
+      timeout: CODEX_TIMEOUT_MS,
+      maxBuffer: 20 * 1024 * 1024,
+    });
+    results.push(JSON.parse(stdout) as Record<string, unknown>);
+  }
+
+  return { status: 'executed', results };
+}
+
 export function initGitKeeperBridge(): void {
   ipcBridge.gitkeeper.getPopupState.provider(async (request) => {
     try {
@@ -156,6 +210,15 @@ export function initGitKeeperBridge(): void {
   ipcBridge.gitkeeper.getAdvisory.provider(async (request) => {
     try {
       return { success: true, data: await buildAdvisory(request) };
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : String(error);
+      return { success: false, msg };
+    }
+  });
+
+  ipcBridge.gitkeeper.executeApprovedPlan.provider(async (request) => {
+    try {
+      return { success: true, data: await executeApprovedPlan(request) };
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error);
       return { success: false, msg };
