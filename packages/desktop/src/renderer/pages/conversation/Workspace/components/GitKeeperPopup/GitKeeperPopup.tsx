@@ -45,6 +45,12 @@ type GitKeeperPopupStateWithSource = GitKeeperPopupState & {
   };
 };
 
+type GitKeeperExecutionNotice = {
+  type: 'info' | 'warning';
+  message: string;
+  pending: boolean;
+};
+
 function machineIcon(machine: GitKeeperPopupMachine): React.ReactNode {
   if (machine.icon === 'apple_laptop') return <CodeLaptop size={18} />;
   if (machine.icon === 'apple_desktop') return <Computer size={18} />;
@@ -85,6 +91,58 @@ function fallbackDirtClassification(card: GitKeeperPopupRepoCard): NonNullable<G
           displayMode: files.length <= 3 ? 'individual' : 'grouped',
           summarizer: 'deterministic',
         }],
+  };
+}
+
+function asRecord(value: unknown): Record<string, unknown> {
+  return value && typeof value === 'object' ? value as Record<string, unknown> : {};
+}
+
+function stringArray(value: unknown): string[] {
+  return Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string') : [];
+}
+
+function formatDirtyPaths(value: unknown): string[] {
+  const paths = stringArray(value);
+  if (paths.length <= 3) return paths;
+  return [`${paths.length} dirty files`];
+}
+
+function formatExecutionNotice(results: Array<Record<string, unknown>>): GitKeeperExecutionNotice {
+  const pendingResults = results.filter((item) => {
+    const status = typeof item.status === 'string' ? item.status : '';
+    return !['completed', 'succeeded', 'executed'].includes(status);
+  });
+  if (pendingResults.length === 0) {
+    return {
+      type: 'info',
+      pending: false,
+      message: 'GitKeeper committed, pushed, and synced all available peers.',
+    };
+  }
+
+  const parts = pendingResults.map((result) => {
+    const repository = typeof result.repo === 'string' ? result.repo : 'repository';
+    const summary = asRecord(result.summary);
+    const syncedPeers = stringArray(summary.syncedPeers);
+    const pendingPeers = Array.isArray(summary.pendingPeers) ? summary.pendingPeers.map(asRecord) : [];
+    const peerText = pendingPeers.map((peer) => {
+      const machine = typeof peer.machine === 'string' ? peer.machine : 'peer';
+      const blockers = stringArray(peer.blockers);
+      const dirtyPaths = formatDirtyPaths(peer.dirtyPaths);
+      const blockerText = blockers.length > 0 ? blockers.map(blockerSummary).join(', ') : 'needs review';
+      const dirtText = dirtyPaths.length > 0 ? ` (${dirtyPaths.join(', ')})` : '';
+      return `${machine}: ${blockerText}${dirtText}`;
+    });
+    const syncedText = syncedPeers.length > 0 ? ` Synced: ${syncedPeers.join(', ')}.` : '';
+    const pendingText = peerText.length > 0 ? ` Pending: ${peerText.join('; ')}.` : '';
+    return `${repository}:${syncedText}${pendingText}`;
+  });
+
+  return {
+    type: 'warning',
+    pending: true,
+    message: `GitKeeper completed the source commit/push, but some peer sync work is still pending. ${parts.join(' ')}`,
   };
 }
 
@@ -414,6 +472,7 @@ const GitKeeperPopup: React.FC<GitKeeperPopupProps> = ({ workspace, conversation
   const [advisoryQuestion, setAdvisoryQuestion] = useState('');
   const [approvedCards, setApprovedCards] = useState<GitKeeperAdvisoryResponse['cards']>([]);
   const [executing, setExecuting] = useState(false);
+  const [executionNotice, setExecutionNotice] = useState<GitKeeperExecutionNotice | null>(null);
 
   const buildAutomaticPlan = useCallback((popupState: GitKeeperPopupState): GitKeeperAdvisoryResponse['cards'] => {
     const stateWithSource = popupState as GitKeeperPopupStateWithSource;
@@ -422,7 +481,6 @@ const GitKeeperPopup: React.FC<GitKeeperPopupProps> = ({ workspace, conversation
       const approvalOnlyBlockers = card.blockers.every((blocker) =>
         ['approved_files_required', 'dirty_files_not_approved'].includes(blocker)
       );
-      const peersAvailable = card.peerState.every((peer) => peer.available);
       if (dirtyFiles.length === 0 && card.blockers.length === 0) {
         return [{
           repositoryId: card.repositoryId,
@@ -433,7 +491,7 @@ const GitKeeperPopup: React.FC<GitKeeperPopupProps> = ({ workspace, conversation
           risks: [],
         }];
       }
-      if (!approvalOnlyBlockers || !peersAvailable || dirtyFiles.length === 0) return [];
+      if (!approvalOnlyBlockers || dirtyFiles.length === 0) return [];
 
       const sourceCard = stateWithSource.source?.dashboard?.cards?.find(
         (item) => item.repositoryId === card.repositoryId && item.machine === popupState.sourceMachine
@@ -512,6 +570,7 @@ const GitKeeperPopup: React.FC<GitKeeperPopupProps> = ({ workspace, conversation
         throw new Error(result.msg || t('conversation.workspace.gitkeeper.loadFailed'));
       }
       setState(result.data);
+      setExecutionNotice(null);
       setAdvisory(null);
       setAdvisoryQuestion('');
       const automaticCards = buildAutomaticPlan(result.data);
@@ -555,6 +614,7 @@ const GitKeeperPopup: React.FC<GitKeeperPopupProps> = ({ workspace, conversation
         ];
     setExecuting(true);
     setError(null);
+    setExecutionNotice(null);
     try {
       const result = await ipcBridge.gitkeeper.executeApprovedPlan.invoke({
         workspace,
@@ -565,14 +625,11 @@ const GitKeeperPopup: React.FC<GitKeeperPopupProps> = ({ workspace, conversation
       if (!result.success || !result.data) {
         throw new Error(result.msg || t('conversation.workspace.gitkeeper.executeFailed'));
       }
-      const pendingResult = result.data.results.find((item) => {
-        const status = typeof item.status === 'string' ? item.status : '';
-        return !['completed', 'succeeded', 'executed'].includes(status);
-      });
+      const executionSummary = formatExecutionNotice(result.data.results);
       await loadPopupState();
-      if (pendingResult) {
-        const status = typeof pendingResult.status === 'string' ? pendingResult.status : 'pending';
-        throw new Error(`GitKeeper executed the source step, but peer sync is ${status}. Review the remaining repo state before closing.`);
+      if (executionSummary.pending) {
+        setExecutionNotice(executionSummary);
+        return;
       }
       setVisible(false);
     } catch (err) {
@@ -624,6 +681,9 @@ const GitKeeperPopup: React.FC<GitKeeperPopupProps> = ({ workspace, conversation
           <Alert type='error' content={error} />
         ) : state ? (
           <>
+            {executionNotice && (
+              <Alert className='mb-12px' type={executionNotice.type} content={executionNotice.message} />
+            )}
             <PopupBody
               state={state}
               approvedCards={approvedCards}
