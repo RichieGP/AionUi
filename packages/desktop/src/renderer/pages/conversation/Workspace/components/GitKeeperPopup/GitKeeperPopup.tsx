@@ -435,6 +435,13 @@ const GitKeeperPopup: React.FC<GitKeeperPopupProps> = ({ workspace, conversation
       }
       if (!approvalOnlyBlockers || !peersAvailable || dirtyFiles.length === 0) return [];
 
+      const sourceCard = stateWithSource.source?.dashboard?.cards?.find(
+        (item) => item.repositoryId === card.repositoryId && item.machine === popupState.sourceMachine
+      );
+      const sourceDirtyFiles = sourceCard?.dirtySummary?.dirtyPaths ?? dirtyFiles;
+      const sourceOwnsCardDirt = dirtyFiles.every((file) => sourceDirtyFiles.includes(file));
+      if (!sourceOwnsCardDirt) return [];
+
       const dashboardCards = stateWithSource.source?.dashboard?.cards?.filter(
         (item) => item.repositoryId === card.repositoryId
       ) ?? [];
@@ -442,16 +449,18 @@ const GitKeeperPopup: React.FC<GitKeeperPopupProps> = ({ workspace, conversation
         ? dashboardCards.every((item) => item.machine === popupState.sourceMachine || (item.dirtySummary?.dirtyCount ?? 0) === 0)
         : true;
 
-      if (!onlySourceDirty) return [];
-
       const repoName = card.repositoryId.split('/').at(-1) ?? card.repositoryId;
       return [{
         repositoryId: card.repositoryId,
-        summary: `Dirty files are isolated to ${popupState.sourceMachine}: ${dirtyFiles.join(', ')}.`,
-        recommendation: 'GitKeeper can commit these source files, push, and fast-forward the clean peers.',
+        summary: onlySourceDirty
+          ? `Dirty files are isolated to ${popupState.sourceMachine}: ${dirtyFiles.join(', ')}.`
+          : `${popupState.sourceMachine} has approvable source dirt; some peers also have local dirt and may need protected reconciliation.`,
+        recommendation: onlySourceDirty
+          ? 'GitKeeper can commit these source files, push, and fast-forward the clean peers.'
+          : 'GitKeeper can commit the source files, push, then reconcile only peers whose dirt matches the pushed change. Any unrelated peer dirt will remain pending.',
         approvedFiles: dirtyFiles,
         commitMessage: `Update ${repoName}`,
-        risks: [],
+        risks: onlySourceDirty ? [] : ['Some peers are dirty; GitKeeper will not discard unrelated peer work.'],
       }];
     });
   }, []);
@@ -556,7 +565,15 @@ const GitKeeperPopup: React.FC<GitKeeperPopupProps> = ({ workspace, conversation
       if (!result.success || !result.data) {
         throw new Error(result.msg || t('conversation.workspace.gitkeeper.executeFailed'));
       }
+      const pendingResult = result.data.results.find((item) => {
+        const status = typeof item.status === 'string' ? item.status : '';
+        return !['completed', 'succeeded', 'executed'].includes(status);
+      });
       await loadPopupState();
+      if (pendingResult) {
+        const status = typeof pendingResult.status === 'string' ? pendingResult.status : 'pending';
+        throw new Error(`GitKeeper executed the source step, but peer sync is ${status}. Review the remaining repo state before closing.`);
+      }
       setVisible(false);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
