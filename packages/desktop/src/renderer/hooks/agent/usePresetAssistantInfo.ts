@@ -235,9 +235,9 @@ export function usePresetAssistantInfo(conversation: TChatConversation | undefin
     () => (remoteAgentId ? ipcBridge.remoteAgent.get.invoke({ id: remoteAgentId }) : null)
   );
 
-  // Backend-registered agents (includes `agent_source === 'custom'` rows). Used
-  // to resolve the user-picked emoji/name for a custom ACP conversation where
-  // no preset assistant was attached.
+  // Backend-registered agents. Used to resolve the row's own icon/name for ACP
+  // conversations where no preset assistant was attached, including extension
+  // adapters discovered from local CLIs.
   const { data: detectedAgents } = useSWR<AgentMetadata[]>(DETECTED_AGENTS_SWR_KEY, fetchDetectedAgents);
 
   return useMemo(() => {
@@ -256,17 +256,17 @@ export function usePresetAssistantInfo(conversation: TChatConversation | undefin
       return { info: null, isLoading: false };
     }
 
-    // Custom ACP row short-circuit: conversation.extra carries `agent_id`
+    // ACP row short-circuit: conversation.extra carries `agent_id`
     // (written by buildAgentConversationParams) or the legacy `custom_agent_id`
-    // alias. Neither is a preset assistant id, so we resolve directly against
-    // the detected-agent catalog and trust the row's own icon/name.
+    // alias. Resolve directly against the detected-agent catalog and trust the
+    // exact row's own icon/name.
     const extra = conversation.extra as { agent_id?: unknown; custom_agent_id?: unknown } | undefined;
     const rowAgentId =
       (typeof extra?.agent_id === 'string' && extra.agent_id.trim()) ||
       (typeof extra?.custom_agent_id === 'string' && extra.custom_agent_id.trim()) ||
       '';
     if (rowAgentId && Array.isArray(detectedAgents)) {
-      const row = detectedAgents.find((a) => a.id === rowAgentId && a.agent_source === 'custom');
+      const row = detectedAgents.find((a) => a.id === rowAgentId);
       if (row) {
         const normalized = normalizeAvatar(row.icon);
         return { info: { name: row.name, logo: normalized.logo, isEmoji: normalized.isEmoji }, isLoading: false };
