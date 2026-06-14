@@ -30,6 +30,7 @@ const CODEX_BIN = '/Users/richard/.local/bin/codex';
 const CODEX_HOME = '/Users/richard/.codex-aion-ollama-qwen3-30b';
 const EXEC_TIMEOUT_MS = 15_000;
 const CODEX_TIMEOUT_MS = 30_000;
+const PENDING_SYNC_TIMEOUT_MS = 30_000;
 const advisorySessions = new Map<string, string[]>();
 
 function normalizeMachineName(raw: string): string {
@@ -71,6 +72,8 @@ async function buildPopupState(request: GitKeeperPopupStateRequest): Promise<Git
     throw new Error('GitKeeper CLI is not built at the expected local path.');
   }
 
+  await retryPendingPeerSyncs();
+
   const repositoryId = await resolveRepositoryId(request);
   const sourceMachine = normalizeMachineName(process.env.GITKEEPER_MACHINE || os.hostname());
   const args = [
@@ -97,6 +100,27 @@ async function buildPopupState(request: GitKeeperPopupStateRequest): Promise<Git
 
   const { stdout } = await execFileAsync(NODE_BIN, args, { timeout: EXEC_TIMEOUT_MS, maxBuffer: 10 * 1024 * 1024 });
   return JSON.parse(stdout) as GitKeeperPopupState;
+}
+
+async function retryPendingPeerSyncs(): Promise<void> {
+  try {
+    const { stdout } = await execFileAsync(
+      NODE_BIN,
+      [GITKEEPER_CLI, 'repo', 'pending-sync', 'retry-all', '--execute', '--json'],
+      { timeout: PENDING_SYNC_TIMEOUT_MS, maxBuffer: 10 * 1024 * 1024 }
+    );
+    const results = JSON.parse(stdout) as Array<{ status?: string }>;
+    if (results.length > 0) {
+      console.info('[GitKeeper] pending peer sync retry completed', {
+        total: results.length,
+        completed: results.filter((result) => result.status === 'completed').length,
+      });
+    }
+  } catch (error) {
+    console.warn('[GitKeeper] pending peer sync retry deferred', {
+      reason: error instanceof Error ? error.message : String(error),
+    });
+  }
 }
 
 function extractJsonObject(raw: string): string {
