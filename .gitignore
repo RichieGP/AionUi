@@ -204,6 +204,7 @@ docs/superpowers/
 resources/bundled-bun
 resources/bundled-aioncore
 resources/hub
+resources/build-info.json
 
 # Server build output
 dist-server/

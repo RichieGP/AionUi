@@ -15,16 +15,69 @@
 import { ipcBridge } from '@/common';
 import { getPlatformServices } from '@/common/platform';
 import { ProcessConfig } from '@process/utils/initStorage';
+import { app } from 'electron';
 import { changeLanguage } from '@process/services/i18n';
 import type { PetSize } from '@process/pet/petTypes';
 import { createOrUpdateTray, destroyTray, setCloseToTrayEnabled } from '@process/utils/tray';
 import { readCloseToTraySetting, writeCloseToTraySetting } from '@process/utils/closeToTraySetting';
+import fs from 'fs';
+import path from 'path';
 
 // Keep-awake power blocker state
 let _keepAwakeBlockerId: number | null = null;
 
 type LanguageChangeListener = () => void;
 let _languageChangeListener: LanguageChangeListener | null = null;
+
+function readBuildInfo() {
+  const candidates = [
+    path.join(process.resourcesPath || '', 'build-info.json'),
+    path.join(app.getAppPath(), '..', 'build-info.json'),
+    path.join(process.cwd(), 'resources', 'build-info.json'),
+  ];
+
+  for (const candidate of candidates) {
+    try {
+      if (!candidate || !fs.existsSync(candidate)) continue;
+      const parsed = JSON.parse(fs.readFileSync(candidate, 'utf8'));
+      return {
+        schema: String(parsed.schema || 'aionui.build-info.v1'),
+        appName: String(parsed.appName || 'AionUi'),
+        appVersion: String(parsed.appVersion || app.getVersion()),
+        buildId: String(parsed.buildId || `${app.getVersion()}+unknown`),
+        buildTime: String(parsed.buildTime || ''),
+        buildSource: String(parsed.buildSource || 'unknown'),
+        gitCommit: String(parsed.gitCommit || 'unknown'),
+        gitCommitFull: String(parsed.gitCommitFull || 'unknown'),
+        gitBranch: String(parsed.gitBranch || 'unknown'),
+        gitDirty: Boolean(parsed.gitDirty),
+        machine: String(parsed.machine || ''),
+        platform: String(parsed.platform || process.platform),
+        arch: String(parsed.arch || process.arch),
+        aioncoreVersion: String(parsed.aioncoreVersion || 'unknown'),
+      };
+    } catch (error) {
+      console.warn('[SystemSettings] Failed to read build info:', error);
+    }
+  }
+
+  return {
+    schema: 'aionui.build-info.v1',
+    appName: 'AionUi',
+    appVersion: app.getVersion(),
+    buildId: `${app.getVersion()}+unknown`,
+    buildTime: '',
+    buildSource: 'unknown',
+    gitCommit: 'unknown',
+    gitCommitFull: 'unknown',
+    gitBranch: 'unknown',
+    gitDirty: false,
+    machine: '',
+    platform: process.platform,
+    arch: process.arch,
+    aioncoreVersion: 'unknown',
+  };
+}
 
 /**
  * 注册语言变更监听器（供主进程 index.ts 使用）
@@ -35,6 +88,8 @@ export function onLanguageChanged(listener: LanguageChangeListener): void {
 }
 
 export function initSystemSettingsBridge(): void {
+  ipcBridge.systemSettings.getBuildInfo.provider(async () => readBuildInfo());
+
   ipcBridge.systemSettings.getCloseToTray.provider(async () => readCloseToTraySetting());
 
   ipcBridge.systemSettings.setCloseToTray.provider(async ({ enabled }) => {

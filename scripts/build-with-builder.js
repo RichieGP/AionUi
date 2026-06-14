@@ -508,6 +508,7 @@ try {
   const { prepareAioncore } = require('../packages/shared-scripts/src/prepare-aioncore.js');
   const { resolveAioncoreVersion } = require('./resolveAioncoreVersion.js');
   const projectRoot = path.resolve(__dirname, '..');
+  execSync('node scripts/write-build-info.js', { stdio: 'inherit', env: process.env });
   prepareAioncore({
     projectRoot,
     platform: process.platform,

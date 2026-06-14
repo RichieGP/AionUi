@@ -9,6 +9,8 @@ import { Github, Right } from '@icon-park/react';
 import React, { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import classNames from 'classnames';
+import { ipcBridge } from '@/common';
+import type { IAionBuildInfo } from '@/common/adapter/ipcBridge';
 import { useSettingsViewMode } from '../settingsViewContext';
 import { isElectronDesktop, openExternalUrl } from '@/renderer/utils/platform';
 import FeedbackReportModal from './FeedbackReportModal';
@@ -31,11 +33,20 @@ const AboutModalContent: React.FC = () => {
 
   const [includePrerelease, setIncludePrerelease] = useState(false);
   const [showFeedbackModal, setShowFeedbackModal] = useState(false);
+  const [buildInfo, setBuildInfo] = useState<IAionBuildInfo | null>(null);
 
   useEffect(() => {
     const saved = localStorage.getItem('update.includePrerelease');
     setIncludePrerelease(saved === 'true');
   }, []);
+
+  useEffect(() => {
+    if (!isElectron) return;
+    ipcBridge.systemSettings.getBuildInfo
+      .invoke()
+      .then(setBuildInfo)
+      .catch((error) => console.warn('Failed to read build info:', error));
+  }, [isElectron]);
 
   const handlePrereleaseChange = (val: boolean) => {
     setIncludePrerelease(val);
@@ -117,6 +128,19 @@ const AboutModalContent: React.FC = () => {
                 <Github theme='outline' size='20' />
               </div>
             </div>
+            {buildInfo && (
+              <div className='flex flex-col items-center gap-4px mb-16px text-center'>
+                <Typography.Text className='text-12px text-t-secondary font-mono'>
+                  {buildInfo.buildId}
+                </Typography.Text>
+                <Typography.Text className='text-11px text-t-tertiary'>
+                  {buildInfo.gitBranch} · {buildInfo.buildSource} · {buildInfo.buildTime || 'unknown build time'}
+                </Typography.Text>
+                <Typography.Text className='text-11px text-t-tertiary'>
+                  AionCore {buildInfo.aioncoreVersion} · {buildInfo.platform}-{buildInfo.arch}
+                </Typography.Text>
+              </div>
+            )}
 
             {/* Check Update Section */}
             {isElectron && (

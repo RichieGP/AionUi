@@ -1288,11 +1288,29 @@ export const theme = {
   requestCurrent: bridge.buildProvider<Theme | null, void>('theme:request-current'),
 };
 
+export interface IAionBuildInfo {
+  schema: string;
+  appName: string;
+  appVersion: string;
+  buildId: string;
+  buildTime: string;
+  buildSource: string;
+  gitCommit: string;
+  gitCommitFull: string;
+  gitBranch: string;
+  gitDirty: boolean;
+  machine: string;
+  platform: string;
+  arch: string;
+  aioncoreVersion: string;
+}
+
 // ---------------------------------------------------------------------------
 // System Settings — routed to /api/settings/* unless they need Electron-native side effects.
 // ---------------------------------------------------------------------------
 
 export const systemSettings = {
+  getBuildInfo: bridge.buildProvider<IAionBuildInfo, void>('system-settings:get-build-info'),
   getCloseToTray: bridge.buildProvider<boolean, void>('system-settings:get-close-to-tray'),
   setCloseToTray: bridge.buildProvider<void, { enabled: boolean }>('system-settings:set-close-to-tray'),
   getNotificationEnabled: httpGet<boolean, void>('/api/settings/client?key=notificationEnabled'),
