@@ -398,32 +398,20 @@ const GitKeeperPopup: React.FC<GitKeeperPopupProps> = ({ workspace, conversation
       const dashboardCards = stateWithSource.source?.dashboard?.cards?.filter(
         (item) => item.repositoryId === card.repositoryId
       ) ?? [];
-      const sourceCard = dashboardCards.find((item) => item.machine === popupState.sourceMachine);
-      const sourceHead = sourceCard?.inspection?.head;
-      const sameHead = dashboardCards.every((item) => !item.inspection?.head || item.inspection.head === sourceHead);
-      const sameDirtyPaths = dashboardCards.every((item) => {
-        const paths = item.dirtySummary?.dirtyPaths ?? [];
-        return paths.length === dirtyFiles.length && dirtyFiles.every((file) => paths.includes(file));
-      });
       const onlySourceDirty = dashboardCards.length > 0
         ? dashboardCards.every((item) => item.machine === popupState.sourceMachine || (item.dirtySummary?.dirtyCount ?? 0) === 0)
         : true;
-      const identicalPeerDirt = dashboardCards.length > 1 && sameHead && sameDirtyPaths;
 
-      if (!onlySourceDirty && !identicalPeerDirt) return [];
+      if (!onlySourceDirty) return [];
 
       const repoName = card.repositoryId.split('/').at(-1) ?? card.repositoryId;
       return [{
         repositoryId: card.repositoryId,
-        summary: identicalPeerDirt
-          ? `Identical dirty files are present on all available machines: ${dirtyFiles.join(', ')}.`
-          : `Dirty files are isolated to ${popupState.sourceMachine}: ${dirtyFiles.join(', ')}.`,
-        recommendation: identicalPeerDirt
-          ? 'GitKeeper should treat this as equivalent dirt, commit from the source, then reconcile matching peer dirt before fast-forwarding peers.'
-          : 'GitKeeper can commit these source files, push, and fast-forward the clean peers.',
+        summary: `Dirty files are isolated to ${popupState.sourceMachine}: ${dirtyFiles.join(', ')}.`,
+        recommendation: 'GitKeeper can commit these source files, push, and fast-forward the clean peers.',
         approvedFiles: dirtyFiles,
         commitMessage: `Update ${repoName}`,
-        risks: identicalPeerDirt ? ['Peer checkouts contain matching local dirt and require protected reconciliation.'] : [],
+        risks: [],
       }];
     });
   }, []);
