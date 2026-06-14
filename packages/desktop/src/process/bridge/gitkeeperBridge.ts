@@ -7,7 +7,7 @@
 import { execFile } from 'node:child_process';
 import os from 'node:os';
 import { promisify } from 'node:util';
-import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { appendFileSync, existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { ipcBridge } from '@/common';
 import type {
@@ -15,6 +15,8 @@ import type {
   GitKeeperAdvisoryResponse,
   GitKeeperExecuteApprovedPlanRequest,
   GitKeeperExecuteApprovedPlanResponse,
+  GitKeeperIgnoreFilesRequest,
+  GitKeeperIgnoreFilesResponse,
   GitKeeperPopupState,
   GitKeeperPopupStateRequest,
 } from '@/common/adapter/ipcBridge';
@@ -168,6 +170,7 @@ async function buildAdvisory(request: GitKeeperAdvisoryRequest): Promise<GitKeep
       return response;
     }
     const response = JSON.parse(extractJsonObject(readFileSync(outputFile, 'utf8'))) as GitKeeperAdvisoryResponse;
+    response.provider = 'codex';
     history.push(`GitKeeper: ${response.answer}`);
     advisorySessions.set(sessionId, history);
     return response;
@@ -180,6 +183,7 @@ function buildDeterministicAdvisory(request: GitKeeperAdvisoryRequest, reason: s
   const question = request.question?.trim();
   return {
     temporaryThreadId: request.threadId ? `gitkeeper-${request.threadId}` : 'gitkeeper-popup',
+    provider: 'deterministic',
     cards: request.state.repoCards.map((card) => {
       const files = Array.from(new Set([...card.dirtyFiles, ...card.leftBehindFiles]));
       const repoName = card.repositoryId.split('/').at(-1) ?? card.repositoryId;
@@ -269,6 +273,39 @@ async function executeApprovedPlan(
   return { status: 'executed', results };
 }
 
+function ignorePatternFor(relativePath: string): string {
+  const clean = relativePath.replaceAll('\\', '/').replace(/^\/+/, '');
+  if (clean.startsWith('../') || clean.includes('/../')) {
+    throw new Error(`Refusing to ignore unsafe path: ${relativePath}`);
+  }
+  if (clean.startsWith('dist/')) return 'dist/';
+  if (clean.startsWith('build/')) return 'build/';
+  return clean;
+}
+
+async function ignoreFiles(request: GitKeeperIgnoreFilesRequest): Promise<GitKeeperIgnoreFilesResponse> {
+  const patterns = Array.from(new Set(request.paths.filter(Boolean).map(ignorePatternFor)));
+  if (patterns.length === 0) {
+    return { status: 'unchanged', patterns: [] };
+  }
+
+  const gitignorePath = path.join(request.workspace, '.gitignore');
+  const existing = existsSync(gitignorePath) ? readFileSync(gitignorePath, 'utf8') : '';
+  const existingLines = new Set(existing.split(/\r?\n/).map((line) => line.trim()).filter(Boolean));
+  const missing = patterns.filter((pattern) => !existingLines.has(pattern));
+
+  if (missing.length === 0) {
+    return { status: 'unchanged', patterns };
+  }
+
+  if (!existsSync(gitignorePath)) {
+    writeFileSync(gitignorePath, '');
+  }
+  const needsLeadingBreak = existing.length > 0 && !existing.endsWith('\n');
+  appendFileSync(gitignorePath, `${needsLeadingBreak ? '\n' : ''}\n# GitKeeper generated artifact ignores\n${missing.join('\n')}\n`);
+  return { status: 'updated', patterns: missing };
+}
+
 export function initGitKeeperBridge(): void {
   ipcBridge.gitkeeper.getPopupState.provider(async (request) => {
     try {
@@ -291,6 +328,15 @@ export function initGitKeeperBridge(): void {
   ipcBridge.gitkeeper.executeApprovedPlan.provider(async (request) => {
     try {
       return { success: true, data: await executeApprovedPlan(request) };
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : String(error);
+      return { success: false, msg };
+    }
+  });
+
+  ipcBridge.gitkeeper.ignoreFiles.provider(async (request) => {
+    try {
+      return { success: true, data: await ignoreFiles(request) };
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error);
       return { success: false, msg };

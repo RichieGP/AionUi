@@ -793,6 +793,7 @@ export type GitKeeperAdvisoryRequest = {
 
 export type GitKeeperAdvisoryResponse = {
   temporaryThreadId: string;
+  provider?: 'codex' | 'deterministic' | string;
   cards: Array<{
     repositoryId: string;
     summary: string;
@@ -816,6 +817,16 @@ export type GitKeeperExecuteApprovedPlanResponse = {
   results: Array<Record<string, unknown>>;
 };
 
+export type GitKeeperIgnoreFilesRequest = {
+  workspace: string;
+  paths: string[];
+};
+
+export type GitKeeperIgnoreFilesResponse = {
+  status: 'updated' | 'unchanged';
+  patterns: string[];
+};
+
 export const gitkeeper = {
   getPopupState: bridge.buildProvider<IBridgeResponse<GitKeeperPopupState>, GitKeeperPopupStateRequest>(
     'gitkeeper.get-popup-state'
@@ -827,6 +838,9 @@ export const gitkeeper = {
     IBridgeResponse<GitKeeperExecuteApprovedPlanResponse>,
     GitKeeperExecuteApprovedPlanRequest
   >('gitkeeper.execute-approved-plan'),
+  ignoreFiles: bridge.buildProvider<IBridgeResponse<GitKeeperIgnoreFilesResponse>, GitKeeperIgnoreFilesRequest>(
+    'gitkeeper.ignore-files'
+  ),
 };
 
 // ---------------------------------------------------------------------------

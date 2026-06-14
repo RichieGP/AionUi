@@ -85,6 +85,31 @@ function dirtyFilesFor(card: GitKeeperPopupRepoCard): string[] {
   return [...new Set([...card.dirtyFiles, ...card.leftBehindFiles])];
 }
 
+function hasGeneratedDirt(card: GitKeeperPopupRepoCard): boolean {
+  return (card.dirtClassification?.groups ?? []).some((group) => group.kind === 'generated');
+}
+
+function statusLabelFor(card: GitKeeperPopupRepoCard, autoApproved: boolean): string {
+  if (autoApproved) return 'Ready';
+  if (hardBlockers(card).length > 0) return 'Blocked';
+  if (dirtyFilesFor(card).length > 0 && card.blockers.every(isApprovalOnlyBlocker)) {
+    return 'Auto-commit criteria not met';
+  }
+  return card.status;
+}
+
+function statusSummaryFor(card: GitKeeperPopupRepoCard, autoApproved: boolean): string {
+  if (autoApproved) return 'GitKeeper has a protected plan ready to commit, push, and sync.';
+  if (hardBlockers(card).length > 0) return 'GitKeeper cannot safely continue until the blocker is resolved.';
+  if (hasGeneratedDirt(card)) {
+    return 'Generated build output is not auto-committed. Choose Gitignore, review with Codex, or commit intentionally.';
+  }
+  if (dirtyFilesFor(card).length > 0) {
+    return 'These files need review before GitKeeper can commit them.';
+  }
+  return 'This repo is ready to push and sync to peers.';
+}
+
 function fallbackDirtClassification(card: GitKeeperPopupRepoCard): NonNullable<GitKeeperPopupRepoCard['dirtClassification']> {
   const files = dirtyFilesFor(card);
   return {
@@ -167,20 +192,20 @@ const MachineNode: React.FC<{ machine: GitKeeperPopupMachine }> = ({ machine }) 
         machine.available ? '' : styles.machineNodeUnavailable
       }`}
     >
-      <div className='flex items-center justify-between gap-6px'>
-        <div className='flex items-center gap-6px min-w-0'>
-          <span className='text-t-secondary flex items-center'>{machineIcon(machine)}</span>
-          <span className='text-13px font-semibold text-t-primary overflow-hidden text-ellipsis whitespace-nowrap'>
-            {machine.label}
-          </span>
-        </div>
-        <Tag size='small' color={machine.available ? 'green' : 'red'}>
-          {machine.available
-            ? t('conversation.workspace.gitkeeper.machineOnline')
-            : t('conversation.workspace.gitkeeper.machineOffline')}
-        </Tag>
+      <Tag className={styles.machineStatusPill} size='small' color={machine.available ? 'green' : 'red'}>
+        {machine.available
+          ? t('conversation.workspace.gitkeeper.machineOnline')
+          : t('conversation.workspace.gitkeeper.machineOffline')}
+      </Tag>
+      <div className={styles.machineIconWrap}>
+        {machineIcon(machine)}
       </div>
-      <div className='text-12px text-t-tertiary mt-8px'>{machine.role}</div>
+      <div className='text-13px font-semibold text-t-primary overflow-hidden text-ellipsis whitespace-nowrap mt-8px text-center'>
+        {machine.label}
+      </div>
+      <div className='text-11px text-t-tertiary mt-2px text-center'>
+        {machine.role}
+      </div>
     </div>
   );
 };
@@ -194,9 +219,11 @@ const MachineFlowRail: React.FC<{ state: GitKeeperPopupState }> = ({ state }) =>
   return (
     <div className={styles.flowRailGrid}>
       <div className={styles.flowSourceSlot}>
+        <div className={styles.flowTitle}>From:</div>
         <MachineNode machine={source} />
       </div>
       <div className={styles.flowPeerStack}>
+        <div className={styles.flowTitle}>To:</div>
         {peers.map((peer) => {
           const flow = state.flows.find((item) => item.to === peer.machine);
           const unavailable = !peer.available || flow?.status === 'failed';
@@ -220,16 +247,19 @@ const RepoCard: React.FC<{
   approvedCard?: GitKeeperAdvisoryResponse['cards'][number];
   executing: boolean;
   onSync: (card: GitKeeperPopupRepoCard) => void;
-}> = ({ card, approvedCard, executing, onSync }) => {
+  onGitignore: (card: GitKeeperPopupRepoCard) => void;
+}> = ({ card, approvedCard, executing, onSync, onGitignore }) => {
   const { t } = useTranslation();
   const dirtyFiles = dirtyFilesFor(card);
   const dirtyCount = dirtyFiles.length;
   const remainingHardBlockers = hardBlockers(card);
-  const autoApproved = Boolean(approvedCard) && remainingHardBlockers.length === 0;
+  const generatedDirt = hasGeneratedDirt(card);
+  const autoApproved = Boolean(approvedCard) && remainingHardBlockers.length === 0 && !generatedDirt;
   const blocked = remainingHardBlockers.length > 0 || (card.status === 'blocked' && !autoApproved);
   const canSync = autoApproved || (dirtyCount === 0 && card.blockers.length === 0);
   const visibleApprovedFiles = new Set([...(card.selectedFiles ?? []), ...(approvedCard?.approvedFiles ?? [])]);
   const dirtClassification = card.dirtClassification ?? fallbackDirtClassification(card);
+  const displayStatus = statusLabelFor(card, autoApproved);
 
   return (
     <div className={styles.repoCard}>
@@ -245,8 +275,8 @@ const RepoCard: React.FC<{
             </div>
           </div>
         </div>
-        <Tag size='small' color={statusColor(autoApproved ? 'ready' : card.status)}>
-          {autoApproved ? 'ready' : card.status}
+        <Tag size='small' color={statusColor(autoApproved ? 'ready' : generatedDirt ? 'pending' : card.status)}>
+          {displayStatus}
         </Tag>
       </div>
       <div className={styles.repoCardBody}>
@@ -305,13 +335,14 @@ const RepoCard: React.FC<{
           </div>
         )}
 
-        {blocked && (
+        {(blocked || generatedDirt) && (
           <Alert
             className='mb-10px'
-            type='warning'
-            title={t('conversation.workspace.gitkeeper.blockedTitle')}
+            type={remainingHardBlockers.length > 0 ? 'warning' : 'info'}
+            title={remainingHardBlockers.length > 0 ? t('conversation.workspace.gitkeeper.blockedTitle') : 'Auto-commit criteria not met'}
             content={
               <div className='flex flex-col gap-4px'>
+                <div>{statusSummaryFor(card, autoApproved)}</div>
                 {remainingHardBlockers.map((blocker) => (
                   <div key={blocker}>{blockerSummary(blocker)}</div>
                 ))}
@@ -319,17 +350,6 @@ const RepoCard: React.FC<{
             }
           />
         )}
-
-        <div className='flex flex-col gap-6px mb-10px'>
-          {card.peerState.map((peer) => (
-            <div key={peer.machine} className='flex items-center justify-between gap-8px text-12px'>
-              <span className='text-t-secondary overflow-hidden text-ellipsis whitespace-nowrap'>{peer.machine}</span>
-              <Tag size='small' color={statusColor(peer.status)}>
-                {peer.status}
-              </Tag>
-            </div>
-          ))}
-        </div>
 
         {card.recommendedActions.length > 0 && (
           <div className='flex flex-col gap-6px'>
@@ -344,15 +364,18 @@ const RepoCard: React.FC<{
 
         <div className={styles.repoActionBar}>
           <div className='text-12px text-t-secondary'>
-            {approvedCard
-              ? t('conversation.workspace.gitkeeper.approvedPlanReady')
-              : canSync
-              ? t('conversation.workspace.gitkeeper.readyToSync')
-              : t('conversation.workspace.gitkeeper.syncBlockedHint')}
+            {statusSummaryFor(card, autoApproved)}
           </div>
-          <Button size='small' type='primary' loading={executing} disabled={!canSync || executing} onClick={() => onSync(card)}>
-            {t('conversation.workspace.gitkeeper.syncNow')}
-          </Button>
+          <div className='flex items-center gap-8px'>
+            {generatedDirt && dirtyFiles.length > 0 && (
+              <Button size='small' disabled={executing} onClick={() => onGitignore(card)}>
+                Gitignore
+              </Button>
+            )}
+            <Button size='small' type='primary' loading={executing} disabled={!canSync || executing} onClick={() => onSync(card)}>
+              {t('conversation.workspace.gitkeeper.syncNow')}
+            </Button>
+          </div>
         </div>
       </div>
     </div>
@@ -364,12 +387,22 @@ const PopupBody: React.FC<{
   approvedCards: GitKeeperAdvisoryResponse['cards'];
   executing: boolean;
   onSync: (card: GitKeeperPopupRepoCard) => void;
-}> = ({ state, approvedCards, executing, onSync }) => {
+  onGitignore: (card: GitKeeperPopupRepoCard) => void;
+}> = ({ state, approvedCards, executing, onSync, onGitignore }) => {
   const { t } = useTranslation();
+  const unavailablePeers = state.machines.filter((machine) => machine.role === 'peer' && !machine.available);
 
   return (
     <div className='flex flex-col gap-14px'>
+      <div className={styles.primaryRepoTitle}>{state.repoCards[0]?.repositoryId ?? 'Repository'}</div>
       <MachineFlowRail state={state} />
+
+      {unavailablePeers.length > 0 && (
+        <Alert
+          type='info'
+          content='Files will be committed and pushed to Git. Sync will occur after offline machines come back online.'
+        />
+      )}
 
       <div className='flex flex-col gap-10px'>
         {state.repoCards.map((card) => (
@@ -379,6 +412,7 @@ const PopupBody: React.FC<{
             approvedCard={approvedCards.find((approved) => approved.repositoryId === card.repositoryId)}
             executing={executing}
             onSync={onSync}
+            onGitignore={onGitignore}
           />
         ))}
       </div>
@@ -410,7 +444,9 @@ const AdvisoryPanel: React.FC<{
             {t('conversation.workspace.gitkeeper.codexAdvisoryTitle')}
           </div>
           <div className='text-12px text-t-tertiary'>
-            {advisory?.temporaryThreadId ?? t('conversation.workspace.gitkeeper.codexAdvisoryPreparing')}
+            {advisory
+              ? `${advisory.provider === 'codex' ? 'Codex-backed' : 'GitKeeper fallback'} · ${advisory.temporaryThreadId}`
+              : t('conversation.workspace.gitkeeper.codexAdvisoryPreparing')}
           </div>
         </div>
         {loading && <Spin size={16} />}
@@ -500,7 +536,7 @@ const GitKeeperPopup: React.FC<GitKeeperPopupProps> = ({ workspace, conversation
           risks: [],
         }];
       }
-      if (!approvalOnlyBlockers || dirtyFiles.length === 0) return [];
+      if (!approvalOnlyBlockers || dirtyFiles.length === 0 || hasGeneratedDirt(card)) return [];
 
       const dashboardCards = stateWithSource.source?.dashboard?.cards?.filter(
         (item) => item.repositoryId === card.repositoryId
@@ -621,6 +657,41 @@ const GitKeeperPopup: React.FC<GitKeeperPopupProps> = ({ workspace, conversation
     }
   }, [conversationId, loadPopupState, state, t, workspace]);
 
+  const executeGitKeeperCardsFromState = useCallback(async (
+    popupState: GitKeeperPopupState,
+    executionCards: GitKeeperAdvisoryResponse['cards']
+  ) => {
+    setExecuting(true);
+    setError(null);
+    setExecutionNotice(null);
+    try {
+      const result = await ipcBridge.gitkeeper.executeApprovedPlan.invoke({
+        workspace,
+        sourceMachine: popupState.sourceMachine,
+        threadId: conversationId,
+        cards: executionCards,
+      });
+      if (!result.success || !result.data) {
+        throw new Error(result.msg || t('conversation.workspace.gitkeeper.executeFailed'));
+      }
+      const executionSummary = formatExecutionNotice(result.data.results);
+      await loadPopupState();
+      setVisible(true);
+      setExecutionNotice(executionSummary.pending
+        ? executionSummary
+        : {
+            type: 'info',
+            pending: false,
+            message: 'GitKeeper has safely committed your project update and synced devices.',
+          });
+    } catch (err) {
+      setVisible(true);
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setExecuting(false);
+    }
+  }, [conversationId, loadPopupState, t, workspace]);
+
   const executeApprovedPlan = useCallback(async (card: GitKeeperPopupRepoCard) => {
     const approvedCard = approvedCards.find((item) => item.repositoryId === card.repositoryId);
     const executionCards: GitKeeperAdvisoryResponse['cards'] = approvedCard
@@ -651,10 +722,66 @@ const GitKeeperPopup: React.FC<GitKeeperPopupProps> = ({ workspace, conversation
     setApprovedCards([]);
   }, [advisory, advisoryQuestion, executeGitKeeperCards, loadAdvisory, state]);
 
-  const openPopup = useCallback(() => {
-    setVisible(true);
-    void loadPopupState();
-  }, [loadPopupState]);
+  const gitignoreCard = useCallback(async (card: GitKeeperPopupRepoCard) => {
+    const paths = dirtyFilesFor(card);
+    if (paths.length === 0) return;
+    setExecuting(true);
+    setError(null);
+    try {
+      const result = await ipcBridge.gitkeeper.ignoreFiles.invoke({ workspace, paths });
+      if (!result.success || !result.data) {
+        throw new Error(result.msg || 'GitKeeper could not update .gitignore');
+      }
+      setExecutionNotice({
+        type: 'info',
+        pending: false,
+        message: `GitKeeper updated .gitignore with: ${result.data.patterns.join(', ')}`,
+      });
+      await loadPopupState();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setExecuting(false);
+    }
+  }, [loadPopupState, workspace]);
+
+  const openPopup = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const result = await ipcBridge.gitkeeper.getPopupState.invoke({
+        workspace,
+        host: 'kodo_aoin_workbench',
+        threadId: conversationId,
+      });
+      if (!result.success || !result.data) {
+        throw new Error(result.msg || t('conversation.workspace.gitkeeper.loadFailed'));
+      }
+      const popupState = result.data;
+      const automaticCards = buildAutomaticPlan(popupState);
+      const canAutoRun = automaticCards.length > 0
+        && automaticCards.length === popupState.repoCards.length
+        && !needsAdvisory(popupState)
+        && popupState.repoCards.every((card) => hardBlockers(card).length === 0 && !hasGeneratedDirt(card));
+
+      setState(popupState);
+      setApprovedCards(automaticCards);
+      setAdvisory(null);
+      setAdvisoryQuestion('');
+      setVisible(true);
+
+      if (canAutoRun) {
+        await executeGitKeeperCardsFromState(popupState, automaticCards);
+      } else if (needsAdvisory(popupState)) {
+        void loadAdvisory(popupState);
+      }
+    } catch (err) {
+      setVisible(true);
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setLoading(false);
+    }
+  }, [buildAutomaticPlan, conversationId, executeGitKeeperCardsFromState, loadAdvisory, needsAdvisory, t, workspace]);
 
   return (
     <>
@@ -701,6 +828,7 @@ const GitKeeperPopup: React.FC<GitKeeperPopupProps> = ({ workspace, conversation
               approvedCards={approvedCards}
               executing={executing}
               onSync={executeApprovedPlan}
+              onGitignore={gitignoreCard}
             />
             {needsAdvisory(state) && (
               <div className='mt-12px'>
