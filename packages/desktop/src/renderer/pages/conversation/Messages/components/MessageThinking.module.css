@@ -1,6 +1,13 @@
 .container {
   width: 100%;
-  margin: 4px 0;
+  margin: 6px 0;
+}
+
+.container[data-active='true'] {
+  padding: 8px 10px;
+  border: 1px solid color-mix(in srgb, var(--aou-3) 70%, transparent);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--aou-1) 42%, transparent);
 }
 
 .header {
@@ -48,14 +55,15 @@
   color: #86909c;
   font-size: 13px;
   line-height: 1.7;
-  padding: 10px 14px;
+  padding: 8px 12px;
   margin-top: 6px;
   margin-left: 20px;
-  background: color-mix(in srgb, var(--aou-1) 50%, #fff);
-  border-radius: 8px;
+  background: color-mix(in srgb, var(--aou-1) 38%, #fff);
+  border-radius: 6px;
   white-space: pre-wrap;
   word-break: break-word;
-  overflow: hidden;
+  overflow-y: auto;
+  max-height: 180px;
 }
 
 :global([data-theme='dark']) .body {

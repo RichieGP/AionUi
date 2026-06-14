@@ -11,6 +11,22 @@ import React, { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import styles from './MessageThinking.module.css';
 
+function splitThinkingContent(text: string, subject?: string, isDone?: boolean) {
+  const normalized = text || '';
+  const lines = normalized.split(/\r?\n/);
+  const firstLine = lines.find((line) => line.trim())?.trim() || '';
+  const canUseFirstLineAsLabel = !subject && !isDone && firstLine.length > 0 && firstLine.length <= 80;
+  if (!canUseFirstLineAsLabel) {
+    return { label: subject || '', body: normalized };
+  }
+  const firstLineIndex = lines.findIndex((line) => line.trim());
+  const body = lines
+    .filter((_, index) => index !== firstLineIndex)
+    .join('\n')
+    .trim();
+  return { label: firstLine, body };
+}
+
 const MessageThinking: React.FC<{ message: IMessageThinking }> = ({ message }) => {
   const { t } = useTranslation();
 
@@ -45,6 +61,8 @@ const MessageThinking: React.FC<{ message: IMessageThinking }> = ({ message }) =
   });
   const startTimeRef = useRef<number>(message.created_at ?? Date.now());
   const bodyRef = useRef<HTMLDivElement>(null);
+  const thinking = splitThinkingContent(text, subject, isDone);
+  const hasBody = thinking.body.trim().length > 0;
 
   // Auto-collapse when status changes to done
   useEffect(() => {
@@ -74,11 +92,11 @@ const MessageThinking: React.FC<{ message: IMessageThinking }> = ({ message }) =
   }, [text, isDone, expanded]);
 
   const summaryText = isDone
-    ? `${t('conversation.thinking.complete', { defaultValue: 'Thought complete' })} · ${formatDuration(duration || 0)}`
-    : `${subject || t('conversation.thinking.label', { defaultValue: 'Thinking...' })} · ${formatElapsedTime(elapsedTime)}`;
+    ? `${thinking.label || t('conversation.thinking.complete', { defaultValue: 'Thought complete' })} · ${formatDuration(duration || 0)}`
+    : `${thinking.label || t('conversation.thinking.label', { defaultValue: 'Thinking...' })} · ${formatElapsedTime(elapsedTime)}`;
 
   return (
-    <div className={styles.container}>
+    <div className={styles.container} data-active={!isDone} aria-live={isDone ? 'off' : 'polite'}>
       <div className={styles.header} onClick={() => setExpanded((v) => !v)}>
         <span className={styles.headerIcon}>{!isDone ? <Spin size={12} /> : <Brain theme='outline' size='14' />}</span>
         <span className={styles.summary}>{summaryText}</span>
@@ -86,9 +104,11 @@ const MessageThinking: React.FC<{ message: IMessageThinking }> = ({ message }) =
           <Right theme='outline' size='12' />
         </span>
       </div>
-      <div ref={bodyRef} className={`${styles.body} ${!expanded ? styles.collapsed : ''}`}>
-        {text}
-      </div>
+      {hasBody ? (
+        <div ref={bodyRef} className={`${styles.body} ${!expanded ? styles.collapsed : ''}`}>
+          {thinking.body}
+        </div>
+      ) : null}
     </div>
   );
 };
