@@ -120,29 +120,59 @@ function advisoryPrompt(request: GitKeeperAdvisoryRequest): string {
 
 async function buildAdvisory(request: GitKeeperAdvisoryRequest): Promise<GitKeeperAdvisoryResponse> {
   if (!existsSync(CODEX_BIN)) {
-    throw new Error('Codex CLI is not available for GitKeeper advisory.');
+    return buildDeterministicAdvisory(request, 'Codex CLI is not available.');
   }
 
   const tempDir = mkdtempSync(path.join(os.tmpdir(), 'gitkeeper-advisory-'));
   const outputFile = path.join(tempDir, 'last-message.json');
 
   try {
-    await execFileAsync(
-      CODEX_BIN,
-      ['exec', '--cd', request.workspace, '--sandbox', 'read-only', '--output-last-message', outputFile, advisoryPrompt(request)],
-      {
-        timeout: CODEX_TIMEOUT_MS,
-        maxBuffer: 10 * 1024 * 1024,
-        env: {
-          ...process.env,
-          CODEX_HOME,
-        },
-      }
-    );
+    try {
+      await execFileAsync(
+        CODEX_BIN,
+        ['exec', '--cd', request.workspace, '--sandbox', 'read-only', '--output-last-message', outputFile, advisoryPrompt(request)],
+        {
+          timeout: CODEX_TIMEOUT_MS,
+          maxBuffer: 10 * 1024 * 1024,
+          env: {
+            ...process.env,
+            CODEX_HOME,
+          },
+        }
+      );
+    } catch (error) {
+      return buildDeterministicAdvisory(request, error instanceof Error ? error.message : String(error));
+    }
+    if (!existsSync(outputFile)) {
+      return buildDeterministicAdvisory(request, 'Codex exited without writing an advisory message.');
+    }
     return JSON.parse(extractJsonObject(readFileSync(outputFile, 'utf8'))) as GitKeeperAdvisoryResponse;
   } finally {
     rmSync(tempDir, { recursive: true, force: true });
   }
+}
+
+function buildDeterministicAdvisory(request: GitKeeperAdvisoryRequest, reason: string): GitKeeperAdvisoryResponse {
+  return {
+    temporaryThreadId: request.threadId ? `gitkeeper-${request.threadId}` : 'gitkeeper-popup',
+    cards: request.state.repoCards.map((card) => {
+      const files = Array.from(new Set([...card.dirtyFiles, ...card.leftBehindFiles]));
+      const repoName = card.repositoryId.split('/').at(-1) ?? card.repositoryId;
+      return {
+        repositoryId: card.repositoryId,
+        summary: files.length > 0 ? `Dirty files: ${files.join(', ')}` : 'No dirty files detected.',
+        recommendation: files.length > 0
+          ? 'GitKeeper can commit approved dirty files if peer checks can be reconciled safely.'
+          : 'GitKeeper can push the source branch and fast-forward peers.',
+        approvedFiles: files,
+        commitMessage: files.length > 0 ? `Update ${repoName}` : '',
+        risks: reason ? [`Codex advisory fallback used: ${reason}`] : [],
+      };
+    }),
+    answer: reason
+      ? `Codex advisory was unavailable, so GitKeeper produced a deterministic file-based recommendation. ${reason}`
+      : 'GitKeeper produced a deterministic file-based recommendation.',
+  };
 }
 
 function operationIdFor(threadId: string | undefined, repositoryId: string): string {

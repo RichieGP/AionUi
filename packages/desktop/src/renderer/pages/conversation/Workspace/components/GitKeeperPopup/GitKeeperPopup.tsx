@@ -23,6 +23,28 @@ type GitKeeperPopupProps = {
   conversationId: string;
 };
 
+type GitKeeperPopupStateWithSource = GitKeeperPopupState & {
+  source?: {
+    dashboard?: {
+      cards?: Array<{
+        machine?: string;
+        repositoryId?: string;
+        state?: string;
+        dirtySummary?: {
+          dirtyCount?: number;
+          dirtyPaths?: string[];
+        };
+        inspection?: {
+          head?: string;
+          workingTree?: {
+            dirtyPaths?: Array<{ path: string; indexStatus?: string; worktreeStatus?: string }>;
+          };
+        };
+      }>;
+    };
+  };
+};
+
 function machineIcon(machine: GitKeeperPopupMachine): React.ReactNode {
   if (machine.icon === 'apple_laptop') return <CodeLaptop size={18} />;
   if (machine.icon === 'apple_desktop') return <Computer size={18} />;
@@ -86,12 +108,12 @@ const MachineFlowRail: React.FC<{ state: GitKeeperPopupState }> = ({ state }) =>
       <div className={styles.flowPeerStack}>
         {peers.map((peer) => {
           const flow = state.flows.find((item) => item.to === peer.machine);
-          const blocked = !peer.available || flow?.status === 'blocked' || flow?.status === 'failed';
+          const unavailable = !peer.available || flow?.status === 'failed';
           return (
             <div key={peer.machine} className={styles.flowPeerRow}>
-              <div className={`${styles.syncArrow} ${blocked ? styles.syncArrowBlocked : styles.syncArrowActive}`}>
+              <div className={`${styles.syncArrow} ${unavailable ? styles.syncArrowBlocked : styles.syncArrowActive}`}>
                 <span className={styles.syncArrowLine} />
-                {blocked ? <CloseOne className={styles.syncArrowCross} size={14} /> : <Right className={styles.syncArrowHead} size={16} />}
+                {unavailable ? <CloseOne className={styles.syncArrowCross} size={14} /> : <Right className={styles.syncArrowHead} size={16} />}
               </div>
               <MachineNode machine={peer} />
             </div>
@@ -111,7 +133,7 @@ const RepoCard: React.FC<{
   const { t } = useTranslation();
   const dirtyCount = card.dirtyFiles.length + card.leftBehindFiles.length;
   const blocked = card.blockers.length > 0 || card.status === 'blocked';
-  const canSync = Boolean(approvedCard) || (dirtyCount === 0 && card.status === 'ready' && card.blockers.length === 0);
+  const canSync = Boolean(approvedCard) || (dirtyCount === 0 && card.blockers.length === 0);
   const visibleApprovedFiles = new Set([...(card.selectedFiles ?? []), ...(approvedCard?.approvedFiles ?? [])]);
 
   return (
@@ -173,13 +195,17 @@ const RepoCard: React.FC<{
         {blocked && (
           <Alert
             className='mb-10px'
-            type='warning'
+            type={approvedCard ? 'info' : 'warning'}
             title={t('conversation.workspace.gitkeeper.blockedTitle')}
             content={
               <div className='flex flex-col gap-4px'>
-                {card.blockers.map((blocker) => (
-                  <div key={blocker}>{blockerSummary(blocker)}</div>
-                ))}
+                {approvedCard ? (
+                  <div>{approvedCard.recommendation}</div>
+                ) : (
+                  card.blockers.map((blocker) => (
+                    <div key={blocker}>{blockerSummary(blocker)}</div>
+                  ))
+                )}
               </div>
             }
           />
@@ -349,9 +375,68 @@ const GitKeeperPopup: React.FC<GitKeeperPopupProps> = ({ workspace, conversation
   const [approvedCards, setApprovedCards] = useState<GitKeeperAdvisoryResponse['cards']>([]);
   const [executing, setExecuting] = useState(false);
 
-  const needsAdvisory = useCallback((popupState: GitKeeperPopupState) => {
-    return popupState.advisory.required || popupState.repoCards.some((card) => card.status !== 'ready' || card.blockers.length > 0);
+  const buildAutomaticPlan = useCallback((popupState: GitKeeperPopupState): GitKeeperAdvisoryResponse['cards'] => {
+    const stateWithSource = popupState as GitKeeperPopupStateWithSource;
+    return popupState.repoCards.flatMap((card) => {
+      const dirtyFiles = [...new Set([...card.dirtyFiles, ...card.leftBehindFiles])];
+      const approvalOnlyBlockers = card.blockers.every((blocker) =>
+        ['approved_files_required', 'dirty_files_not_approved'].includes(blocker)
+      );
+      const peersAvailable = card.peerState.every((peer) => peer.available);
+      if (dirtyFiles.length === 0 && card.blockers.length === 0) {
+        return [{
+          repositoryId: card.repositoryId,
+          summary: 'Repository is clean on the source machine.',
+          recommendation: 'GitKeeper can push the source branch and fast-forward available peers.',
+          approvedFiles: [],
+          commitMessage: '',
+          risks: [],
+        }];
+      }
+      if (!approvalOnlyBlockers || !peersAvailable || dirtyFiles.length === 0) return [];
+
+      const dashboardCards = stateWithSource.source?.dashboard?.cards?.filter(
+        (item) => item.repositoryId === card.repositoryId
+      ) ?? [];
+      const sourceCard = dashboardCards.find((item) => item.machine === popupState.sourceMachine);
+      const sourceHead = sourceCard?.inspection?.head;
+      const sameHead = dashboardCards.every((item) => !item.inspection?.head || item.inspection.head === sourceHead);
+      const sameDirtyPaths = dashboardCards.every((item) => {
+        const paths = item.dirtySummary?.dirtyPaths ?? [];
+        return paths.length === dirtyFiles.length && dirtyFiles.every((file) => paths.includes(file));
+      });
+      const onlySourceDirty = dashboardCards.length > 0
+        ? dashboardCards.every((item) => item.machine === popupState.sourceMachine || (item.dirtySummary?.dirtyCount ?? 0) === 0)
+        : true;
+      const identicalPeerDirt = dashboardCards.length > 1 && sameHead && sameDirtyPaths;
+
+      if (!onlySourceDirty && !identicalPeerDirt) return [];
+
+      const repoName = card.repositoryId.split('/').at(-1) ?? card.repositoryId;
+      return [{
+        repositoryId: card.repositoryId,
+        summary: identicalPeerDirt
+          ? `Identical dirty files are present on all available machines: ${dirtyFiles.join(', ')}.`
+          : `Dirty files are isolated to ${popupState.sourceMachine}: ${dirtyFiles.join(', ')}.`,
+        recommendation: identicalPeerDirt
+          ? 'GitKeeper should treat this as equivalent dirt, commit from the source, then reconcile matching peer dirt before fast-forwarding peers.'
+          : 'GitKeeper can commit these source files, push, and fast-forward the clean peers.',
+        approvedFiles: dirtyFiles,
+        commitMessage: `Update ${repoName}`,
+        risks: identicalPeerDirt ? ['Peer checkouts contain matching local dirt and require protected reconciliation.'] : [],
+      }];
+    });
   }, []);
+
+  const needsAdvisory = useCallback((popupState: GitKeeperPopupState) => {
+    const automaticCards = buildAutomaticPlan(popupState);
+    const unresolvedCards = popupState.repoCards.filter((card) => {
+      const dirtyCount = card.dirtyFiles.length + card.leftBehindFiles.length;
+      const hasAutoCard = automaticCards.some((item) => item.repositoryId === card.repositoryId);
+      return dirtyCount > 0 && !hasAutoCard;
+    });
+    return popupState.advisory.required || unresolvedCards.length > 0;
+  }, [buildAutomaticPlan]);
 
   const loadAdvisory = useCallback(
     async (popupState: GitKeeperPopupState, question = '') => {
@@ -392,7 +477,8 @@ const GitKeeperPopup: React.FC<GitKeeperPopupProps> = ({ workspace, conversation
       setState(result.data);
       setAdvisory(null);
       setAdvisoryQuestion('');
-      setApprovedCards([]);
+      const automaticCards = buildAutomaticPlan(result.data);
+      setApprovedCards(automaticCards);
       if (needsAdvisory(result.data)) {
         void loadAdvisory(result.data);
       }
@@ -401,7 +487,7 @@ const GitKeeperPopup: React.FC<GitKeeperPopupProps> = ({ workspace, conversation
     } finally {
       setLoading(false);
     }
-  }, [conversationId, loadAdvisory, needsAdvisory, t, workspace]);
+  }, [buildAutomaticPlan, conversationId, loadAdvisory, needsAdvisory, t, workspace]);
 
   const sendAdvisoryQuestion = useCallback(() => {
     if (!state || !advisoryQuestion.trim()) return;
