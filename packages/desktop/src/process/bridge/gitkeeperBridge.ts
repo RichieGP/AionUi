@@ -7,16 +7,25 @@
 import { execFile } from 'node:child_process';
 import os from 'node:os';
 import { promisify } from 'node:util';
-import { existsSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import path from 'node:path';
 import { ipcBridge } from '@/common';
-import type { GitKeeperPopupState, GitKeeperPopupStateRequest } from '@/common/adapter/ipcBridge';
+import type {
+  GitKeeperAdvisoryRequest,
+  GitKeeperAdvisoryResponse,
+  GitKeeperPopupState,
+  GitKeeperPopupStateRequest,
+} from '@/common/adapter/ipcBridge';
 
 const execFileAsync = promisify(execFile);
 
 const GITKEEPER_CLI = '/Users/richard/coding-projects/github-repos/gitkeeper/dist/cli.js';
 const NODE_BIN = '/Users/richard/Coding Tools/bin/node';
 const GIT_BIN = '/Users/richard/Coding Tools/bin/git';
+const CODEX_BIN = '/Users/richard/.local/bin/codex';
+const CODEX_HOME = '/Users/richard/.codex-aion-ollama-qwen3-30b';
 const EXEC_TIMEOUT_MS = 15_000;
+const CODEX_TIMEOUT_MS = 90_000;
 
 function normalizeMachineName(raw: string): string {
   const value = raw.trim().toLowerCase();
@@ -85,10 +94,68 @@ async function buildPopupState(request: GitKeeperPopupStateRequest): Promise<Git
   return JSON.parse(stdout) as GitKeeperPopupState;
 }
 
+function extractJsonObject(raw: string): string {
+  const start = raw.indexOf('{');
+  const end = raw.lastIndexOf('}');
+  if (start < 0 || end < start) throw new Error('Codex advisory did not return JSON.');
+  return raw.slice(start, end + 1);
+}
+
+function advisoryPrompt(request: GitKeeperAdvisoryRequest): string {
+  return [
+    'You are GitKeeper v2 advisory mode inside the Aion popup.',
+    'Read-only task: summarize dirty repo state and recommend an explicit per-repo commit/sync plan.',
+    'Do not edit files, run mutation commands, commit, push, reset, stash, or discard anything.',
+    'Return strict JSON only with this shape:',
+    '{"temporaryThreadId":"string","cards":[{"repositoryId":"string","summary":"string","recommendation":"string","approvedFiles":["path"],"commitMessage":"string","risks":["string"]}],"answer":"string"}',
+    'Use concise, practical recommendations. If the user asks a follow-up question, answer it in the same JSON answer field and keep cards current.',
+    `Workspace: ${request.workspace}`,
+    `Thread id: ${request.threadId ?? 'unknown'}`,
+    `User question: ${request.question?.trim() || 'Initial advisory summary and recommendation.'}`,
+    `GitKeeper popup state JSON: ${JSON.stringify(request.state)}`,
+  ].join('\n\n');
+}
+
+async function buildAdvisory(request: GitKeeperAdvisoryRequest): Promise<GitKeeperAdvisoryResponse> {
+  if (!existsSync(CODEX_BIN)) {
+    throw new Error('Codex CLI is not available for GitKeeper advisory.');
+  }
+
+  const tempDir = mkdtempSync(path.join(os.tmpdir(), 'gitkeeper-advisory-'));
+  const outputFile = path.join(tempDir, 'last-message.json');
+
+  try {
+    await execFileAsync(
+      CODEX_BIN,
+      ['exec', '--cd', request.workspace, '--sandbox', 'read-only', '--output-last-message', outputFile, advisoryPrompt(request)],
+      {
+        timeout: CODEX_TIMEOUT_MS,
+        maxBuffer: 10 * 1024 * 1024,
+        env: {
+          ...process.env,
+          CODEX_HOME,
+        },
+      }
+    );
+    return JSON.parse(extractJsonObject(readFileSync(outputFile, 'utf8'))) as GitKeeperAdvisoryResponse;
+  } finally {
+    rmSync(tempDir, { recursive: true, force: true });
+  }
+}
+
 export function initGitKeeperBridge(): void {
   ipcBridge.gitkeeper.getPopupState.provider(async (request) => {
     try {
       return { success: true, data: await buildPopupState(request) };
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : String(error);
+      return { success: false, msg };
+    }
+  });
+
+  ipcBridge.gitkeeper.getAdvisory.provider(async (request) => {
+    try {
+      return { success: true, data: await buildAdvisory(request) };
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error);
       return { success: false, msg };

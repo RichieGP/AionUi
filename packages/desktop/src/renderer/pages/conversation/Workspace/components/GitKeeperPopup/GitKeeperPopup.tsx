@@ -5,11 +5,16 @@
  */
 
 import { ipcBridge } from '@/common';
-import type { GitKeeperPopupMachine, GitKeeperPopupRepoCard, GitKeeperPopupState } from '@/common/adapter/ipcBridge';
+import type {
+  GitKeeperAdvisoryResponse,
+  GitKeeperPopupMachine,
+  GitKeeperPopupRepoCard,
+  GitKeeperPopupState,
+} from '@/common/adapter/ipcBridge';
 import { iconColors } from '@/renderer/styles/colors';
-import { Alert, Button, Empty, Modal, Spin, Tag, Tooltip } from '@arco-design/web-react';
-import { Apple, Branch, CheckOne, CodeLaptop, Computer, DatabaseSync, Refresh, Right } from '@icon-park/react';
-import React, { useCallback, useMemo, useState } from 'react';
+import { Alert, Button, Empty, Input, Modal, Spin, Tag, Tooltip } from '@arco-design/web-react';
+import { Apple, Branch, CheckOne, CloseOne, CodeLaptop, Computer, DatabaseSync, Refresh, Right } from '@icon-park/react';
+import React, { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import styles from './GitKeeperPopup.module.css';
 
@@ -30,6 +35,14 @@ function statusColor(status: string): 'green' | 'orange' | 'red' | 'blue' | 'gra
   if (status === 'needs_confirmation' || status === 'pending') return 'orange';
   if (status === 'executed') return 'blue';
   return 'gray';
+}
+
+function blockerSummary(blocker: string): string {
+  if (blocker === 'approved_files_required') return 'Select or approve the files GitKeeper is allowed to commit.';
+  if (blocker === 'dirty_files_not_approved') return 'The dirty files are visible, but none are approved for commit yet.';
+  if (blocker === 'left_behind_dirty_files_require_review') return 'Some dirty files are outside the approved set and need review.';
+  if (blocker === 'repo_path_missing') return 'This repository path is missing on one of the machines.';
+  return blocker.replaceAll('_', ' ');
 }
 
 const MachineNode: React.FC<{ machine: GitKeeperPopupMachine }> = ({ machine }) => {
@@ -59,9 +72,41 @@ const MachineNode: React.FC<{ machine: GitKeeperPopupMachine }> = ({ machine }) 
   );
 };
 
+const MachineFlowRail: React.FC<{ state: GitKeeperPopupState }> = ({ state }) => {
+  const source = state.machines.find((machine) => machine.role === 'source');
+  const peers = state.machines.filter((machine) => machine.role === 'peer');
+
+  if (!source) return null;
+
+  return (
+    <div className={styles.flowRailGrid}>
+      <div className={styles.flowSourceSlot}>
+        <MachineNode machine={source} />
+      </div>
+      <div className={styles.flowPeerStack}>
+        {peers.map((peer) => {
+          const flow = state.flows.find((item) => item.to === peer.machine);
+          const blocked = !peer.available || flow?.status === 'blocked' || flow?.status === 'failed';
+          return (
+            <div key={peer.machine} className={styles.flowPeerRow}>
+              <div className={`${styles.syncArrow} ${blocked ? styles.syncArrowBlocked : styles.syncArrowActive}`}>
+                <span className={styles.syncArrowLine} />
+                {blocked ? <CloseOne className={styles.syncArrowCross} size={14} /> : <Right className={styles.syncArrowHead} size={16} />}
+              </div>
+              <MachineNode machine={peer} />
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+};
+
 const RepoCard: React.FC<{ card: GitKeeperPopupRepoCard }> = ({ card }) => {
   const { t } = useTranslation();
   const dirtyCount = card.dirtyFiles.length + card.leftBehindFiles.length;
+  const blocked = card.blockers.length > 0 || card.status === 'blocked';
+  const canSync = card.status === 'ready' && card.blockers.length === 0;
 
   return (
     <div className={styles.repoCard}>
@@ -99,9 +144,16 @@ const RepoCard: React.FC<{ card: GitKeeperPopupRepoCard }> = ({ card }) => {
 
         {card.dirtyFiles.length > 0 || card.leftBehindFiles.length > 0 ? (
           <div className={`${styles.fileList} mb-10px`}>
-            {[...card.dirtyFiles, ...card.leftBehindFiles].map((file) => (
-              <div key={file} className={`${styles.fileRow} text-12px text-t-secondary font-mono`}>
-                {file}
+            {[...new Set([...card.dirtyFiles, ...card.leftBehindFiles])].map((file) => (
+              <div key={file} className={styles.fileRow}>
+                <span className='text-12px text-t-secondary font-mono overflow-hidden text-ellipsis whitespace-nowrap'>
+                  {file}
+                </span>
+                <Tag size='small' color={card.selectedFiles.includes(file) ? 'green' : 'orange'}>
+                  {card.selectedFiles.includes(file)
+                    ? t('conversation.workspace.gitkeeper.approved')
+                    : t('conversation.workspace.gitkeeper.needsApproval')}
+                </Tag>
               </div>
             ))}
           </div>
@@ -110,6 +162,21 @@ const RepoCard: React.FC<{ card: GitKeeperPopupRepoCard }> = ({ card }) => {
             <CheckOne size={14} />
             <span>{t('conversation.workspace.gitkeeper.clean')}</span>
           </div>
+        )}
+
+        {blocked && (
+          <Alert
+            className='mb-10px'
+            type='warning'
+            title={t('conversation.workspace.gitkeeper.blockedTitle')}
+            content={
+              <div className='flex flex-col gap-4px'>
+                {card.blockers.map((blocker) => (
+                  <div key={blocker}>{blockerSummary(blocker)}</div>
+                ))}
+              </div>
+            }
+          />
         )}
 
         <div className='flex flex-col gap-6px mb-10px'>
@@ -133,6 +200,17 @@ const RepoCard: React.FC<{ card: GitKeeperPopupRepoCard }> = ({ card }) => {
             ))}
           </div>
         )}
+
+        <div className={styles.repoActionBar}>
+          <div className='text-12px text-t-secondary'>
+            {canSync
+              ? t('conversation.workspace.gitkeeper.readyToSync')
+              : t('conversation.workspace.gitkeeper.syncBlockedHint')}
+          </div>
+          <Button size='small' type='primary' disabled={!canSync}>
+            {t('conversation.workspace.gitkeeper.syncNow')}
+          </Button>
+        </div>
       </div>
     </div>
   );
@@ -140,22 +218,10 @@ const RepoCard: React.FC<{ card: GitKeeperPopupRepoCard }> = ({ card }) => {
 
 const PopupBody: React.FC<{ state: GitKeeperPopupState }> = ({ state }) => {
   const { t } = useTranslation();
-  const sourceMachine = useMemo(() => state.machines.find((machine) => machine.role === 'source'), [state.machines]);
 
   return (
     <div className='flex flex-col gap-14px'>
-      <div className={styles.machineRail}>
-        {state.machines.map((machine) => (
-          <MachineNode key={machine.machine} machine={machine} />
-        ))}
-      </div>
-      {sourceMachine && state.flows.length > 0 && (
-        <div className='flex items-center gap-8px text-12px text-t-secondary'>
-          <span className='font-semibold text-t-primary'>{sourceMachine.label}</span>
-          <div className={styles.flowLine} />
-          <span>{state.flows.map((flow) => flow.to).join(', ')}</span>
-        </div>
-      )}
+      <MachineFlowRail state={state} />
 
       <div className='flex flex-col gap-10px'>
         {state.repoCards.map((card) => (
@@ -170,12 +236,108 @@ const PopupBody: React.FC<{ state: GitKeeperPopupState }> = ({ state }) => {
   );
 };
 
+const AdvisoryPanel: React.FC<{
+  advisory: GitKeeperAdvisoryResponse | null;
+  loading: boolean;
+  error: string | null;
+  question: string;
+  onQuestionChange: (value: string) => void;
+  onSend: () => void;
+}> = ({ advisory, loading, error, question, onQuestionChange, onSend }) => {
+  const { t } = useTranslation();
+
+  return (
+    <div className={styles.advisoryPanel}>
+      <div className='flex items-center justify-between gap-8px mb-10px'>
+        <div>
+          <div className='text-13px font-semibold text-t-primary'>
+            {t('conversation.workspace.gitkeeper.codexAdvisoryTitle')}
+          </div>
+          <div className='text-12px text-t-tertiary'>
+            {advisory?.temporaryThreadId ?? t('conversation.workspace.gitkeeper.codexAdvisoryPreparing')}
+          </div>
+        </div>
+        {loading && <Spin size={16} />}
+      </div>
+
+      {error && <Alert className='mb-10px' type='error' content={error} />}
+
+      {advisory?.cards.map((card) => (
+        <div key={card.repositoryId} className={styles.recommendationCard}>
+          <div className='text-13px font-semibold text-t-primary mb-4px'>{card.repositoryId}</div>
+          <div className='text-12px text-t-secondary mb-6px'>{card.summary}</div>
+          <div className='text-12px text-t-primary mb-8px'>{card.recommendation}</div>
+          <div className='flex flex-wrap gap-6px mb-8px'>
+            {card.approvedFiles.map((file) => (
+              <Tag key={file} size='small' color='green'>
+                {file}
+              </Tag>
+            ))}
+          </div>
+          <div className='text-12px text-t-secondary'>
+            {t('conversation.workspace.gitkeeper.commitMessage')}: {card.commitMessage}
+          </div>
+          {card.risks.length > 0 && (
+            <div className='text-12px text-warning-6 mt-6px'>{card.risks.join(' ')}</div>
+          )}
+        </div>
+      ))}
+
+      {advisory?.answer && <div className={styles.codexAnswer}>{advisory.answer}</div>}
+
+      <div className={styles.chatRow}>
+        <Input.TextArea
+          autoSize={{ minRows: 1, maxRows: 3 }}
+          value={question}
+          placeholder={t('conversation.workspace.gitkeeper.codexChatPlaceholder')}
+          onChange={onQuestionChange}
+        />
+        <Button type='primary' loading={loading} disabled={!question.trim()} onClick={onSend}>
+          {t('conversation.workspace.gitkeeper.askCodex')}
+        </Button>
+      </div>
+    </div>
+  );
+};
+
 const GitKeeperPopup: React.FC<GitKeeperPopupProps> = ({ workspace, conversationId }) => {
   const { t } = useTranslation();
   const [visible, setVisible] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [state, setState] = useState<GitKeeperPopupState | null>(null);
+  const [advisory, setAdvisory] = useState<GitKeeperAdvisoryResponse | null>(null);
+  const [advisoryLoading, setAdvisoryLoading] = useState(false);
+  const [advisoryError, setAdvisoryError] = useState<string | null>(null);
+  const [advisoryQuestion, setAdvisoryQuestion] = useState('');
+
+  const needsAdvisory = useCallback((popupState: GitKeeperPopupState) => {
+    return popupState.advisory.required || popupState.repoCards.some((card) => card.status !== 'ready' || card.blockers.length > 0);
+  }, []);
+
+  const loadAdvisory = useCallback(
+    async (popupState: GitKeeperPopupState, question = '') => {
+      setAdvisoryLoading(true);
+      setAdvisoryError(null);
+      try {
+        const result = await ipcBridge.gitkeeper.getAdvisory.invoke({
+          workspace,
+          threadId: conversationId,
+          question,
+          state: popupState,
+        });
+        if (!result.success || !result.data) {
+          throw new Error(result.msg || t('conversation.workspace.gitkeeper.codexAdvisoryFailed'));
+        }
+        setAdvisory(result.data);
+      } catch (err) {
+        setAdvisoryError(err instanceof Error ? err.message : String(err));
+      } finally {
+        setAdvisoryLoading(false);
+      }
+    },
+    [conversationId, t, workspace]
+  );
 
   const loadPopupState = useCallback(async () => {
     setLoading(true);
@@ -190,12 +352,23 @@ const GitKeeperPopup: React.FC<GitKeeperPopupProps> = ({ workspace, conversation
         throw new Error(result.msg || t('conversation.workspace.gitkeeper.loadFailed'));
       }
       setState(result.data);
+      setAdvisory(null);
+      setAdvisoryQuestion('');
+      if (needsAdvisory(result.data)) {
+        void loadAdvisory(result.data);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
       setLoading(false);
     }
-  }, [conversationId, t, workspace]);
+  }, [conversationId, loadAdvisory, needsAdvisory, t, workspace]);
+
+  const sendAdvisoryQuestion = useCallback(() => {
+    if (!state || !advisoryQuestion.trim()) return;
+    void loadAdvisory(state, advisoryQuestion.trim());
+    setAdvisoryQuestion('');
+  }, [advisoryQuestion, loadAdvisory, state]);
 
   const openPopup = useCallback(() => {
     setVisible(true);
@@ -238,7 +411,21 @@ const GitKeeperPopup: React.FC<GitKeeperPopupProps> = ({ workspace, conversation
         ) : error ? (
           <Alert type='error' content={error} />
         ) : state ? (
-          <PopupBody state={state} />
+          <>
+            <PopupBody state={state} />
+            {needsAdvisory(state) && (
+              <div className='mt-12px'>
+                <AdvisoryPanel
+                  advisory={advisory}
+                  loading={advisoryLoading}
+                  error={advisoryError}
+                  question={advisoryQuestion}
+                  onQuestionChange={setAdvisoryQuestion}
+                  onSend={sendAdvisoryQuestion}
+                />
+              </div>
+            )}
+          </>
         ) : (
           <Empty description={t('conversation.workspace.gitkeeper.empty')} />
         )}

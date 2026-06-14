@@ -769,9 +769,32 @@ export type GitKeeperPopupStateRequest = {
   offlineMachines?: string[];
 };
 
+export type GitKeeperAdvisoryRequest = {
+  workspace: string;
+  threadId?: string;
+  question?: string;
+  state: GitKeeperPopupState;
+};
+
+export type GitKeeperAdvisoryResponse = {
+  temporaryThreadId: string;
+  cards: Array<{
+    repositoryId: string;
+    summary: string;
+    recommendation: string;
+    approvedFiles: string[];
+    commitMessage: string;
+    risks: string[];
+  }>;
+  answer: string;
+};
+
 export const gitkeeper = {
   getPopupState: bridge.buildProvider<IBridgeResponse<GitKeeperPopupState>, GitKeeperPopupStateRequest>(
     'gitkeeper.get-popup-state'
+  ),
+  getAdvisory: bridge.buildProvider<IBridgeResponse<GitKeeperAdvisoryResponse>, GitKeeperAdvisoryRequest>(
+    'gitkeeper.get-advisory'
   ),
 };
 
