@@ -29,7 +29,7 @@ const GIT_BIN = '/Users/richard/Coding Tools/bin/git';
 const CODEX_BIN = '/Users/richard/.local/bin/codex';
 const CODEX_HOME = '/Users/richard/.codex-aion-ollama-qwen3-30b';
 const EXEC_TIMEOUT_MS = 15_000;
-const CODEX_TIMEOUT_MS = 90_000;
+const CODEX_TIMEOUT_MS = 30_000;
 const advisorySessions = new Map<string, string[]>();
 
 function normalizeMachineName(raw: string): string {
@@ -134,6 +134,7 @@ async function buildAdvisory(request: GitKeeperAdvisoryRequest): Promise<GitKeep
   }
 
   if (!existsSync(CODEX_BIN)) {
+    console.warn('[GitKeeper] Codex advisory fallback: Codex CLI is not available');
     const response = buildDeterministicAdvisory(request, 'Codex CLI is not available.');
     history.push(`GitKeeper: ${response.answer}`);
     advisorySessions.set(sessionId, history);
@@ -145,6 +146,11 @@ async function buildAdvisory(request: GitKeeperAdvisoryRequest): Promise<GitKeep
 
   try {
     try {
+      console.info('[GitKeeper] Codex advisory start', {
+        sessionId,
+        workspace: request.workspace,
+        question: request.question?.trim() || 'initial',
+      });
       await execFileAsync(
         CODEX_BIN,
         ['exec', '--cd', request.workspace, '--sandbox', 'read-only', '--output-last-message', outputFile, advisoryPrompt(request, history)],
@@ -158,12 +164,15 @@ async function buildAdvisory(request: GitKeeperAdvisoryRequest): Promise<GitKeep
         }
       );
     } catch (error) {
-      const response = buildDeterministicAdvisory(request, error instanceof Error ? error.message : String(error));
+      const reason = error instanceof Error ? error.message : String(error);
+      console.warn('[GitKeeper] Codex advisory fallback after exec failure', { sessionId, reason });
+      const response = buildDeterministicAdvisory(request, reason);
       history.push(`GitKeeper: ${response.answer}`);
       advisorySessions.set(sessionId, history);
       return response;
     }
     if (!existsSync(outputFile)) {
+      console.warn('[GitKeeper] Codex advisory fallback: output file missing', { sessionId, outputFile });
       const response = buildDeterministicAdvisory(request, 'Codex exited without writing an advisory message.');
       history.push(`GitKeeper: ${response.answer}`);
       advisorySessions.set(sessionId, history);
@@ -171,6 +180,10 @@ async function buildAdvisory(request: GitKeeperAdvisoryRequest): Promise<GitKeep
     }
     const response = JSON.parse(extractJsonObject(readFileSync(outputFile, 'utf8'))) as GitKeeperAdvisoryResponse;
     response.provider = 'codex';
+    console.info('[GitKeeper] Codex advisory succeeded', {
+      sessionId,
+      cards: response.cards.length,
+    });
     history.push(`GitKeeper: ${response.answer}`);
     advisorySessions.set(sessionId, history);
     return response;

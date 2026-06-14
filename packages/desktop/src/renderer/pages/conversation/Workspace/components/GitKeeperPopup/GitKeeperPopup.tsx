@@ -89,8 +89,8 @@ function hasGeneratedDirt(card: GitKeeperPopupRepoCard): boolean {
   return (card.dirtClassification?.groups ?? []).some((group) => group.kind === 'generated');
 }
 
-function statusLabelFor(card: GitKeeperPopupRepoCard, autoApproved: boolean): string {
-  if (autoApproved) return 'Ready';
+function statusLabelFor(card: GitKeeperPopupRepoCard, approved: boolean): string {
+  if (approved) return 'Ready';
   if (hardBlockers(card).length > 0) return 'Blocked';
   if (dirtyFilesFor(card).length > 0 && card.blockers.every(isApprovalOnlyBlocker)) {
     return 'Auto-commit criteria not met';
@@ -98,8 +98,8 @@ function statusLabelFor(card: GitKeeperPopupRepoCard, autoApproved: boolean): st
   return card.status;
 }
 
-function statusSummaryFor(card: GitKeeperPopupRepoCard, autoApproved: boolean): string {
-  if (autoApproved) return 'GitKeeper has a protected plan ready to commit, push, and sync.';
+function statusSummaryFor(card: GitKeeperPopupRepoCard, approved: boolean): string {
+  if (approved) return 'GitKeeper has an approved protected plan ready to commit, push, and sync.';
   if (hardBlockers(card).length > 0) return 'GitKeeper cannot safely continue until the blocker is resolved.';
   if (hasGeneratedDirt(card)) {
     return 'Generated build output is not auto-committed. Choose Gitignore, review with Codex, or commit intentionally.';
@@ -254,12 +254,13 @@ const RepoCard: React.FC<{
   const dirtyCount = dirtyFiles.length;
   const remainingHardBlockers = hardBlockers(card);
   const generatedDirt = hasGeneratedDirt(card);
-  const autoApproved = Boolean(approvedCard) && remainingHardBlockers.length === 0 && !generatedDirt;
-  const blocked = remainingHardBlockers.length > 0 || (card.status === 'blocked' && !autoApproved);
-  const canSync = autoApproved || (dirtyCount === 0 && card.blockers.length === 0);
+  const explicitlyApproved = Boolean(approvedCard);
+  const approved = explicitlyApproved && remainingHardBlockers.length === 0;
+  const blocked = remainingHardBlockers.length > 0 || (card.status === 'blocked' && !approved);
+  const canSync = approved || (dirtyCount === 0 && card.blockers.length === 0);
   const visibleApprovedFiles = new Set([...(card.selectedFiles ?? []), ...(approvedCard?.approvedFiles ?? [])]);
   const dirtClassification = card.dirtClassification ?? fallbackDirtClassification(card);
-  const displayStatus = statusLabelFor(card, autoApproved);
+  const displayStatus = statusLabelFor(card, approved);
 
   return (
     <div className={styles.repoCard}>
@@ -275,28 +276,14 @@ const RepoCard: React.FC<{
             </div>
           </div>
         </div>
-        <Tag size='small' color={statusColor(autoApproved ? 'ready' : generatedDirt ? 'pending' : card.status)}>
+        <Tag size='small' color={statusColor(approved ? 'ready' : generatedDirt ? 'pending' : card.status)}>
           {displayStatus}
         </Tag>
       </div>
       <div className={styles.repoCardBody}>
-        <div className='grid grid-cols-3 gap-8px mb-10px'>
-          <div className='text-12px text-t-secondary'>
-            <div className='font-semibold text-t-primary'>{dirtyCount}</div>
-            <div>{t('conversation.workspace.gitkeeper.dirtyFiles')}</div>
-          </div>
-          <div className='text-12px text-t-secondary'>
-            <div className='font-semibold text-t-primary'>{remainingHardBlockers.length}</div>
-            <div>{t('conversation.workspace.gitkeeper.blockers')}</div>
-          </div>
-          <div className='text-12px text-t-secondary'>
-            <div className='font-semibold text-t-primary'>{card.recommendedActions.length}</div>
-            <div>{t('conversation.workspace.gitkeeper.actions')}</div>
-          </div>
-        </div>
-
         {dirtClassification.displayMode !== 'clean' ? (
           <div className='mb-10px'>
+            <div className='text-12px font-semibold text-t-primary mb-6px'>Dirty Files:</div>
             <div className='text-12px text-t-secondary mb-6px'>{dirtClassification.summary}</div>
             <div className={styles.fileList}>
               {dirtClassification.displayMode === 'individual'
@@ -304,6 +291,9 @@ const RepoCard: React.FC<{
                     <div key={file} className={styles.fileRow}>
                       <span className='text-12px text-t-secondary font-mono overflow-hidden text-ellipsis whitespace-nowrap'>
                         {file}
+                      </span>
+                      <span className='text-11px text-t-tertiary overflow-hidden text-ellipsis whitespace-nowrap'>
+                        {generatedDirt ? 'Generated build artifact; commit only if intentional.' : 'Source change selected for review.'}
                       </span>
                       <Tag size='small' color={visibleApprovedFiles.has(file) ? 'green' : 'orange'}>
                         {visibleApprovedFiles.has(file)
@@ -335,14 +325,14 @@ const RepoCard: React.FC<{
           </div>
         )}
 
-        {(blocked || generatedDirt) && (
+        {(blocked || (generatedDirt && !approved)) && (
           <Alert
             className='mb-10px'
             type={remainingHardBlockers.length > 0 ? 'warning' : 'info'}
             title={remainingHardBlockers.length > 0 ? t('conversation.workspace.gitkeeper.blockedTitle') : 'Auto-commit criteria not met'}
             content={
               <div className='flex flex-col gap-4px'>
-                <div>{statusSummaryFor(card, autoApproved)}</div>
+                <div>{statusSummaryFor(card, approved)}</div>
                 {remainingHardBlockers.map((blocker) => (
                   <div key={blocker}>{blockerSummary(blocker)}</div>
                 ))}
@@ -351,20 +341,9 @@ const RepoCard: React.FC<{
           />
         )}
 
-        {card.recommendedActions.length > 0 && (
-          <div className='flex flex-col gap-6px'>
-            {card.recommendedActions.map((action) => (
-              <div key={`${action.order}-${action.action}`} className='text-12px text-t-secondary flex gap-6px'>
-                <Right size={12} className='mt-2px flex-shrink-0' />
-                <span>{action.summary}</span>
-              </div>
-            ))}
-          </div>
-        )}
-
         <div className={styles.repoActionBar}>
           <div className='text-12px text-t-secondary'>
-            {statusSummaryFor(card, autoApproved)}
+            {statusSummaryFor(card, approved)}
           </div>
           <div className='flex items-center gap-8px'>
             {generatedDirt && dirtyFiles.length > 0 && (
