@@ -146,6 +146,33 @@ function formatDirtyPaths(value: unknown): string[] {
 }
 
 function formatExecutionNotice(results: Array<Record<string, unknown>>): GitKeeperExecutionNotice {
+  const group = results.find((item) => item.operationType === 'thread_operation_group');
+  if (group) {
+    const status = typeof group.status === 'string' ? group.status : 'failed';
+    const receipt = asRecord(group.receipt);
+    const summary = typeof receipt.summary === 'string' ? receipt.summary : 'GitKeeper operation group completed.';
+    const recovery = typeof receipt.recovery === 'string' ? ` ${receipt.recovery}` : '';
+    if (status === 'succeeded') {
+      return {
+        type: 'info',
+        pending: false,
+        message: 'GitKeeper has safely committed your project update and synced available devices.',
+      };
+    }
+    if (status === 'partial_failed') {
+      return {
+        type: 'warning',
+        pending: true,
+        message: `${summary}${recovery}`,
+      };
+    }
+    return {
+      type: 'warning',
+      pending: true,
+      message: `${summary}${recovery}`,
+    };
+  }
+
   const pendingResults = results.filter((item) => {
     const status = typeof item.status === 'string' ? item.status : '';
     return !['completed', 'succeeded', 'executed'].includes(status);
@@ -617,6 +644,7 @@ const GitKeeperPopup: React.FC<GitKeeperPopupProps> = ({ workspace, conversation
         workspace,
         sourceMachine: state.sourceMachine,
         threadId: conversationId,
+        state,
         cards: executionCards,
       });
       if (!result.success || !result.data) {
@@ -648,6 +676,7 @@ const GitKeeperPopup: React.FC<GitKeeperPopupProps> = ({ workspace, conversation
         workspace,
         sourceMachine: popupState.sourceMachine,
         threadId: conversationId,
+        state: popupState,
         cards: executionCards,
       });
       if (!result.success || !result.data) {

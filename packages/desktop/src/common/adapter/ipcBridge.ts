@@ -774,6 +774,10 @@ export type GitKeeperPopupState = {
     closeWhenComplete: boolean;
     deleteTemporaryCodexThread: boolean;
   };
+  source?: {
+    dashboard?: Record<string, unknown>;
+    preflight?: Record<string, unknown>;
+  };
 };
 
 export type GitKeeperPopupStateRequest = {
@@ -809,6 +813,7 @@ export type GitKeeperExecuteApprovedPlanRequest = {
   workspace: string;
   sourceMachine: string;
   threadId?: string;
+  state: GitKeeperPopupState;
   cards: GitKeeperAdvisoryResponse['cards'];
 };
 

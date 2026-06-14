@@ -254,9 +254,63 @@ function buildDeterministicAdvisory(request: GitKeeperAdvisoryRequest, reason: s
   };
 }
 
-function operationIdFor(threadId: string | undefined, repositoryId: string): string {
-  const prefix = threadId?.trim() || 'aion-popup';
-  return `${prefix}-${repositoryId.replaceAll('/', '-')}`;
+function approvedPreflightFor(request: GitKeeperExecuteApprovedPlanRequest): Record<string, unknown> {
+  const preflight = request.state.source?.preflight;
+  if (!preflight || typeof preflight !== 'object') {
+    throw new Error('GitKeeper popup state is missing source preflight data.');
+  }
+
+  const cardsByRepo = new Map(request.cards.map((card) => [card.repositoryId, card]));
+  const rawPlans = Array.isArray((preflight as { repoPlans?: unknown }).repoPlans)
+    ? (preflight as { repoPlans: Array<Record<string, unknown>> }).repoPlans
+    : [];
+  const repoPlans = rawPlans.map((plan) => {
+    const repositoryId = typeof plan.repositoryId === 'string' ? plan.repositoryId : '';
+    const card = cardsByRepo.get(repositoryId);
+    if (!card) return plan;
+    const approvedFiles = Array.from(new Set(card.approvedFiles.filter(Boolean))).sort();
+    return {
+      ...plan,
+      status: plan.status === 'blocked' && approvedFiles.length > 0 ? 'ready' : plan.status,
+      approvedFiles,
+      leftBehindFiles: Array.isArray(plan.leftBehindFiles)
+        ? plan.leftBehindFiles.filter((file): file is string => typeof file === 'string' && !approvedFiles.includes(file))
+        : [],
+      commitMessage: card.commitMessage || plan.commitMessage,
+      blockers: Array.isArray(plan.blockers)
+        ? plan.blockers
+          .map(String)
+          .filter((blocker) => !['approved_files_required', 'dirty_files_not_approved'].includes(blocker))
+        : [],
+      warnings: Array.isArray(plan.warnings)
+        ? plan.warnings.map(String).filter((warning) => warning !== 'left_behind_dirty_files_require_review')
+        : [],
+    };
+  });
+  const groupBlockers = repoPlans.flatMap((plan) => Array.isArray(plan.blockers) ? plan.blockers.map(String) : []);
+  const requiresAdvisory = repoPlans.some((plan) => plan.status === 'needs_codex_advisory');
+  const status = groupBlockers.length > 0 ? 'blocked' : requiresAdvisory ? 'needs_codex_advisory' : 'ready';
+  return {
+    ...preflight,
+    status,
+    canProceedAutomatically: status === 'ready',
+    requiresCodexAdvisory: requiresAdvisory,
+    blockers: groupBlockers,
+    warnings: Array.isArray((preflight as { warnings?: unknown }).warnings)
+      ? (preflight as { warnings: unknown[] }).warnings
+        .map(String)
+        .filter((warning) => warning !== 'codex_advisory_required_for_some_repos')
+      : [],
+    repoPlans,
+  };
+}
+
+function formatGroupExecutionResult(result: Record<string, unknown>): GitKeeperExecuteApprovedPlanResponse {
+  const status = typeof result.status === 'string' ? result.status : 'failed';
+  return {
+    status,
+    results: [result],
+  };
 }
 
 async function executeApprovedPlan(
@@ -266,48 +320,39 @@ async function executeApprovedPlan(
     throw new Error('GitKeeper CLI is not built at the expected local path.');
   }
 
-  const results: Array<Record<string, unknown>> = [];
   const sourceMachine = normalizeMachineName(request.sourceMachine);
+  const tempDir = mkdtempSync(path.join(os.tmpdir(), 'gitkeeper-execute-group-'));
+  const preflightFile = path.join(tempDir, 'preflight.json');
 
-  for (const card of request.cards) {
-    const args = [
+  writeFileSync(preflightFile, JSON.stringify(approvedPreflightFor(request), null, 2));
+  const { stdout } = await execFileAsync(
+    NODE_BIN,
+    [
       GITKEEPER_CLI,
-      'repo',
-      'remote-propagate',
-      '--operation-id',
-      operationIdFor(request.threadId, card.repositoryId),
-      '--source-path',
-      request.workspace,
-      '--source-machine',
-      sourceMachine,
-      '--repository-id',
-      card.repositoryId,
+      'thread',
+      'execute-group',
+      '--preflight-file',
+      preflightFile,
       '--execute',
-      '--json',
-    ];
-
-    if (card.commitMessage.trim()) {
-      args.push('--message', card.commitMessage);
-    }
-
-    for (const file of card.approvedFiles) {
-      args.push('--approve-path', file);
-    }
-
-    // Keep protected Git operations sequential so receipts and peer sync state stay ordered per repo.
-    // eslint-disable-next-line no-await-in-loop
-    const { stdout } = await execFileAsync(NODE_BIN, args, {
-      timeout: CODEX_TIMEOUT_MS,
-      maxBuffer: 20 * 1024 * 1024,
-    });
-    results.push(JSON.parse(stdout) as Record<string, unknown>);
-  }
+      '--grant-confirmation',
+      '--actor',
+      'aion',
+      '--caller',
+      'aion-gitkeeper-popup',
+      '--idempotency-key',
+      request.threadId?.trim() ? `aion-popup:${request.threadId.trim()}` : `aion-popup:${sourceMachine}:${Date.now()}`,
+    ],
+    { timeout: CODEX_TIMEOUT_MS, maxBuffer: 20 * 1024 * 1024 }
+  ).finally(() => {
+    rmSync(tempDir, { recursive: true, force: true });
+  });
+  const result = JSON.parse(stdout) as Record<string, unknown>;
 
   if (request.threadId?.trim()) {
     advisorySessions.delete(`${request.threadId.trim()}:${request.workspace}`);
   }
 
-  return { status: 'executed', results };
+  return formatGroupExecutionResult(result);
 }
 
 function ignorePatternFor(relativePath: string): string {
