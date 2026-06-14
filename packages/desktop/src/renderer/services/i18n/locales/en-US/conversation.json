@@ -362,7 +362,7 @@
       "readyToSync": "This repo is ready to push and sync to peers.",
       "syncBlockedHint": "Approve a commit plan for these files before GitKeeper can sync.",
       "syncNow": "Sync",
-      "approvedPlanReady": "Approved Codex plan is ready for GitKeeper to commit, push, and sync.",
+      "approvedPlanReady": "GitKeeper has an approved protected plan ready to commit, push, and sync.",
       "approvePlan": "Approve plan",
       "planApproved": "Plan approved. Use Sync on the repo card to execute it through GitKeeper.",
       "planApprovalHint": "Approve this recommendation before GitKeeper mutates the repo.",

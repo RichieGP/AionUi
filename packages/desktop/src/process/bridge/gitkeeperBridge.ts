@@ -28,6 +28,7 @@ const CODEX_BIN = '/Users/richard/.local/bin/codex';
 const CODEX_HOME = '/Users/richard/.codex-aion-ollama-qwen3-30b';
 const EXEC_TIMEOUT_MS = 15_000;
 const CODEX_TIMEOUT_MS = 90_000;
+const advisorySessions = new Map<string, string[]>();
 
 function normalizeMachineName(raw: string): string {
   const value = raw.trim().toLowerCase();
@@ -103,7 +104,11 @@ function extractJsonObject(raw: string): string {
   return raw.slice(start, end + 1);
 }
 
-function advisoryPrompt(request: GitKeeperAdvisoryRequest): string {
+function advisorySessionId(request: GitKeeperAdvisoryRequest): string {
+  return `${request.threadId?.trim() || 'popup'}:${request.workspace}`;
+}
+
+function advisoryPrompt(request: GitKeeperAdvisoryRequest, history: string[]): string {
   return [
     'You are GitKeeper v2 advisory mode inside the Aion popup.',
     'Read-only task: summarize dirty repo state and recommend an explicit per-repo commit/sync plan.',
@@ -113,14 +118,24 @@ function advisoryPrompt(request: GitKeeperAdvisoryRequest): string {
     'Use concise, practical recommendations. If the user asks a follow-up question, answer it in the same JSON answer field and keep cards current.',
     `Workspace: ${request.workspace}`,
     `Thread id: ${request.threadId ?? 'unknown'}`,
+    `Recent advisory chat: ${history.slice(-6).join('\n') || 'none'}`,
     `User question: ${request.question?.trim() || 'Initial advisory summary and recommendation.'}`,
     `GitKeeper popup state JSON: ${JSON.stringify(request.state)}`,
   ].join('\n\n');
 }
 
 async function buildAdvisory(request: GitKeeperAdvisoryRequest): Promise<GitKeeperAdvisoryResponse> {
+  const sessionId = advisorySessionId(request);
+  const history = advisorySessions.get(sessionId) ?? [];
+  if (request.question?.trim()) {
+    history.push(`User: ${request.question.trim()}`);
+  }
+
   if (!existsSync(CODEX_BIN)) {
-    return buildDeterministicAdvisory(request, 'Codex CLI is not available.');
+    const response = buildDeterministicAdvisory(request, 'Codex CLI is not available.');
+    history.push(`GitKeeper: ${response.answer}`);
+    advisorySessions.set(sessionId, history);
+    return response;
   }
 
   const tempDir = mkdtempSync(path.join(os.tmpdir(), 'gitkeeper-advisory-'));
@@ -130,7 +145,7 @@ async function buildAdvisory(request: GitKeeperAdvisoryRequest): Promise<GitKeep
     try {
       await execFileAsync(
         CODEX_BIN,
-        ['exec', '--cd', request.workspace, '--sandbox', 'read-only', '--output-last-message', outputFile, advisoryPrompt(request)],
+        ['exec', '--cd', request.workspace, '--sandbox', 'read-only', '--output-last-message', outputFile, advisoryPrompt(request, history)],
         {
           timeout: CODEX_TIMEOUT_MS,
           maxBuffer: 10 * 1024 * 1024,
@@ -141,37 +156,60 @@ async function buildAdvisory(request: GitKeeperAdvisoryRequest): Promise<GitKeep
         }
       );
     } catch (error) {
-      return buildDeterministicAdvisory(request, error instanceof Error ? error.message : String(error));
+      const response = buildDeterministicAdvisory(request, error instanceof Error ? error.message : String(error));
+      history.push(`GitKeeper: ${response.answer}`);
+      advisorySessions.set(sessionId, history);
+      return response;
     }
     if (!existsSync(outputFile)) {
-      return buildDeterministicAdvisory(request, 'Codex exited without writing an advisory message.');
+      const response = buildDeterministicAdvisory(request, 'Codex exited without writing an advisory message.');
+      history.push(`GitKeeper: ${response.answer}`);
+      advisorySessions.set(sessionId, history);
+      return response;
     }
-    return JSON.parse(extractJsonObject(readFileSync(outputFile, 'utf8'))) as GitKeeperAdvisoryResponse;
+    const response = JSON.parse(extractJsonObject(readFileSync(outputFile, 'utf8'))) as GitKeeperAdvisoryResponse;
+    history.push(`GitKeeper: ${response.answer}`);
+    advisorySessions.set(sessionId, history);
+    return response;
   } finally {
     rmSync(tempDir, { recursive: true, force: true });
   }
 }
 
 function buildDeterministicAdvisory(request: GitKeeperAdvisoryRequest, reason: string): GitKeeperAdvisoryResponse {
+  const question = request.question?.trim();
   return {
     temporaryThreadId: request.threadId ? `gitkeeper-${request.threadId}` : 'gitkeeper-popup',
     cards: request.state.repoCards.map((card) => {
       const files = Array.from(new Set([...card.dirtyFiles, ...card.leftBehindFiles]));
       const repoName = card.repositoryId.split('/').at(-1) ?? card.repositoryId;
+      const hardBlockers = card.blockers.filter((blocker) => !['approved_files_required', 'dirty_files_not_approved'].includes(blocker));
+      const groupedSummary = files.length === 0
+        ? 'No dirty files detected.'
+        : files.length <= 3
+        ? `Dirty source files: ${files.join(', ')}.`
+        : `${files.length} dirty source files grouped for one protected GitKeeper checkpoint.`;
+      const recommendation = hardBlockers.length > 0
+        ? `Do not auto-sync yet. Resolve blockers first: ${hardBlockers.join(', ')}.`
+        : files.length > 0
+        ? 'Commit the source-owned dirt, push it, then fast-forward clean peers. If a peer has unrelated dirt, leave that peer pending and show the reason.'
+        : 'Push the source branch if needed and fast-forward available peers.';
       return {
         repositoryId: card.repositoryId,
-        summary: files.length > 0 ? `Dirty files: ${files.join(', ')}` : 'No dirty files detected.',
-        recommendation: files.length > 0
-          ? 'GitKeeper can commit approved dirty files if peer checks can be reconciled safely.'
-          : 'GitKeeper can push the source branch and fast-forward peers.',
-        approvedFiles: files,
+        summary: groupedSummary,
+        recommendation,
+        approvedFiles: hardBlockers.length > 0 ? [] : files,
         commitMessage: files.length > 0 ? `Update ${repoName}` : '',
         risks: reason ? [`Codex advisory fallback used: ${reason}`] : [],
       };
     }),
-    answer: reason
-      ? `Codex advisory was unavailable, so GitKeeper produced a deterministic file-based recommendation. ${reason}`
-      : 'GitKeeper produced a deterministic file-based recommendation.',
+    answer: [
+      question ? `Question: ${question}` : 'Initial GitKeeper advisory.',
+      reason
+        ? `Codex advisory was unavailable, so GitKeeper produced a deterministic recommendation. ${reason}`
+        : 'GitKeeper produced a deterministic recommendation.',
+      'If the recommendation is acceptable, type ok or press Approve plan, then GitKeeper will execute through the protected operation route.',
+    ].join(' '),
   };
 }
 
@@ -222,6 +260,10 @@ async function executeApprovedPlan(
       maxBuffer: 20 * 1024 * 1024,
     });
     results.push(JSON.parse(stdout) as Record<string, unknown>);
+  }
+
+  if (request.threadId?.trim()) {
+    advisorySessions.delete(`${request.threadId.trim()}:${request.workspace}`);
   }
 
   return { status: 'executed', results };

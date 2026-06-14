@@ -73,8 +73,20 @@ function blockerSummary(blocker: string): string {
   return blocker.replaceAll('_', ' ');
 }
 
+function isApprovalOnlyBlocker(blocker: string): boolean {
+  return ['approved_files_required', 'dirty_files_not_approved'].includes(blocker);
+}
+
+function hardBlockers(card: GitKeeperPopupRepoCard): string[] {
+  return card.blockers.filter((blocker) => !isApprovalOnlyBlocker(blocker));
+}
+
+function dirtyFilesFor(card: GitKeeperPopupRepoCard): string[] {
+  return [...new Set([...card.dirtyFiles, ...card.leftBehindFiles])];
+}
+
 function fallbackDirtClassification(card: GitKeeperPopupRepoCard): NonNullable<GitKeeperPopupRepoCard['dirtClassification']> {
-  const files = [...new Set([...card.dirtyFiles, ...card.leftBehindFiles])];
+  const files = dirtyFilesFor(card);
   return {
     totalFiles: files.length,
     displayMode: files.length === 0 ? 'clean' : files.length <= 3 ? 'individual' : 'grouped',
@@ -210,9 +222,12 @@ const RepoCard: React.FC<{
   onSync: (card: GitKeeperPopupRepoCard) => void;
 }> = ({ card, approvedCard, executing, onSync }) => {
   const { t } = useTranslation();
-  const dirtyCount = card.dirtyFiles.length + card.leftBehindFiles.length;
-  const blocked = card.blockers.length > 0 || card.status === 'blocked';
-  const canSync = Boolean(approvedCard) || (dirtyCount === 0 && card.blockers.length === 0);
+  const dirtyFiles = dirtyFilesFor(card);
+  const dirtyCount = dirtyFiles.length;
+  const remainingHardBlockers = hardBlockers(card);
+  const autoApproved = Boolean(approvedCard) && remainingHardBlockers.length === 0;
+  const blocked = remainingHardBlockers.length > 0 || (card.status === 'blocked' && !autoApproved);
+  const canSync = autoApproved || (dirtyCount === 0 && card.blockers.length === 0);
   const visibleApprovedFiles = new Set([...(card.selectedFiles ?? []), ...(approvedCard?.approvedFiles ?? [])]);
   const dirtClassification = card.dirtClassification ?? fallbackDirtClassification(card);
 
@@ -230,8 +245,8 @@ const RepoCard: React.FC<{
             </div>
           </div>
         </div>
-        <Tag size='small' color={statusColor(card.status)}>
-          {card.status}
+        <Tag size='small' color={statusColor(autoApproved ? 'ready' : card.status)}>
+          {autoApproved ? 'ready' : card.status}
         </Tag>
       </div>
       <div className={styles.repoCardBody}>
@@ -241,7 +256,7 @@ const RepoCard: React.FC<{
             <div>{t('conversation.workspace.gitkeeper.dirtyFiles')}</div>
           </div>
           <div className='text-12px text-t-secondary'>
-            <div className='font-semibold text-t-primary'>{card.blockers.length}</div>
+            <div className='font-semibold text-t-primary'>{remainingHardBlockers.length}</div>
             <div>{t('conversation.workspace.gitkeeper.blockers')}</div>
           </div>
           <div className='text-12px text-t-secondary'>
@@ -293,17 +308,13 @@ const RepoCard: React.FC<{
         {blocked && (
           <Alert
             className='mb-10px'
-            type={approvedCard ? 'info' : 'warning'}
+            type='warning'
             title={t('conversation.workspace.gitkeeper.blockedTitle')}
             content={
               <div className='flex flex-col gap-4px'>
-                {approvedCard ? (
-                  <div>{approvedCard.recommendation}</div>
-                ) : (
-                  card.blockers.map((blocker) => (
-                    <div key={blocker}>{blockerSummary(blocker)}</div>
-                  ))
-                )}
+                {remainingHardBlockers.map((blocker) => (
+                  <div key={blocker}>{blockerSummary(blocker)}</div>
+                ))}
               </div>
             }
           />
@@ -477,10 +488,8 @@ const GitKeeperPopup: React.FC<GitKeeperPopupProps> = ({ workspace, conversation
   const buildAutomaticPlan = useCallback((popupState: GitKeeperPopupState): GitKeeperAdvisoryResponse['cards'] => {
     const stateWithSource = popupState as GitKeeperPopupStateWithSource;
     return popupState.repoCards.flatMap((card) => {
-      const dirtyFiles = [...new Set([...card.dirtyFiles, ...card.leftBehindFiles])];
-      const approvalOnlyBlockers = card.blockers.every((blocker) =>
-        ['approved_files_required', 'dirty_files_not_approved'].includes(blocker)
-      );
+      const dirtyFiles = dirtyFilesFor(card);
+      const approvalOnlyBlockers = card.blockers.every(isApprovalOnlyBlocker);
       if (dirtyFiles.length === 0 && card.blockers.length === 0) {
         return [{
           repositoryId: card.repositoryId,
@@ -492,13 +501,6 @@ const GitKeeperPopup: React.FC<GitKeeperPopupProps> = ({ workspace, conversation
         }];
       }
       if (!approvalOnlyBlockers || dirtyFiles.length === 0) return [];
-
-      const sourceCard = stateWithSource.source?.dashboard?.cards?.find(
-        (item) => item.repositoryId === card.repositoryId && item.machine === popupState.sourceMachine
-      );
-      const sourceDirtyFiles = sourceCard?.dirtySummary?.dirtyPaths ?? dirtyFiles;
-      const sourceOwnsCardDirt = dirtyFiles.every((file) => sourceDirtyFiles.includes(file));
-      if (!sourceOwnsCardDirt) return [];
 
       const dashboardCards = stateWithSource.source?.dashboard?.cards?.filter(
         (item) => item.repositoryId === card.repositoryId
@@ -526,11 +528,11 @@ const GitKeeperPopup: React.FC<GitKeeperPopupProps> = ({ workspace, conversation
   const needsAdvisory = useCallback((popupState: GitKeeperPopupState) => {
     const automaticCards = buildAutomaticPlan(popupState);
     const unresolvedCards = popupState.repoCards.filter((card) => {
-      const dirtyCount = card.dirtyFiles.length + card.leftBehindFiles.length;
+      const dirtyCount = dirtyFilesFor(card).length;
       const hasAutoCard = automaticCards.some((item) => item.repositoryId === card.repositoryId);
-      return dirtyCount > 0 && !hasAutoCard;
+      return (dirtyCount > 0 || hardBlockers(card).length > 0) && !hasAutoCard;
     });
-    return popupState.advisory.required || unresolvedCards.length > 0;
+    return unresolvedCards.length > 0 || (popupState.advisory.required && automaticCards.length === 0);
   }, [buildAutomaticPlan]);
 
   const loadAdvisory = useCallback(
@@ -585,33 +587,13 @@ const GitKeeperPopup: React.FC<GitKeeperPopupProps> = ({ workspace, conversation
     }
   }, [buildAutomaticPlan, conversationId, loadAdvisory, needsAdvisory, t, workspace]);
 
-  const sendAdvisoryQuestion = useCallback(() => {
-    if (!state || !advisoryQuestion.trim()) return;
-    void loadAdvisory(state, advisoryQuestion.trim());
-    setAdvisoryQuestion('');
-    setApprovedCards([]);
-  }, [advisoryQuestion, loadAdvisory, state]);
-
   const approveCurrentPlan = useCallback(() => {
     if (!advisory) return;
     setApprovedCards(advisory.cards);
   }, [advisory]);
 
-  const executeApprovedPlan = useCallback(async (card: GitKeeperPopupRepoCard) => {
+  const executeGitKeeperCards = useCallback(async (executionCards: GitKeeperAdvisoryResponse['cards']) => {
     if (!state) return;
-    const approvedCard = approvedCards.find((item) => item.repositoryId === card.repositoryId);
-    const executionCards: GitKeeperAdvisoryResponse['cards'] = approvedCard
-      ? [approvedCard]
-      : [
-          {
-            repositoryId: card.repositoryId,
-            summary: 'Clean repo sync',
-            recommendation: 'Push current source branch and fast-forward peers.',
-            approvedFiles: [],
-            commitMessage: '',
-            risks: [],
-          },
-        ];
     setExecuting(true);
     setError(null);
     setExecutionNotice(null);
@@ -637,7 +619,37 @@ const GitKeeperPopup: React.FC<GitKeeperPopupProps> = ({ workspace, conversation
     } finally {
       setExecuting(false);
     }
-  }, [approvedCards, conversationId, loadPopupState, state, t, workspace]);
+  }, [conversationId, loadPopupState, state, t, workspace]);
+
+  const executeApprovedPlan = useCallback(async (card: GitKeeperPopupRepoCard) => {
+    const approvedCard = approvedCards.find((item) => item.repositoryId === card.repositoryId);
+    const executionCards: GitKeeperAdvisoryResponse['cards'] = approvedCard
+      ? [approvedCard]
+      : [
+          {
+            repositoryId: card.repositoryId,
+            summary: 'Clean repo sync',
+            recommendation: 'Push current source branch and fast-forward peers.',
+            approvedFiles: [],
+            commitMessage: '',
+            risks: [],
+          },
+        ];
+    await executeGitKeeperCards(executionCards);
+  }, [approvedCards, executeGitKeeperCards]);
+
+  const sendAdvisoryQuestion = useCallback(() => {
+    if (!state || !advisoryQuestion.trim()) return;
+    const question = advisoryQuestion.trim();
+    setAdvisoryQuestion('');
+    if (/^(ok|okay|yes|approve|approved|go|sync)$/i.test(question) && advisory?.cards.length) {
+      setApprovedCards(advisory.cards);
+      void executeGitKeeperCards(advisory.cards);
+      return;
+    }
+    void loadAdvisory(state, question);
+    setApprovedCards([]);
+  }, [advisory, advisoryQuestion, executeGitKeeperCards, loadAdvisory, state]);
 
   const openPopup = useCallback(() => {
     setVisible(true);
