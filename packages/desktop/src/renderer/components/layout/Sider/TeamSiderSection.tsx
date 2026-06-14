@@ -109,42 +109,49 @@ const TeamSiderSection: React.FC<TeamSiderSectionProps> = ({
   return (
     <>
       {collapsed ? (
-        sortedTeams.length > 0 && (
-          <div className='shrink-0 flex flex-col gap-2px'>
-            {sortedTeams.map((team) => {
-              const isActive = pathname.startsWith(`/team/${team.id}`);
-              return (
-                <Tooltip key={team.id} {...siderTooltipProps} content={team.name} position='right'>
-                  <div
-                    data-testid={`collapsed-team-item-${team.id}`}
-                    className={classNames(
-                      'relative w-full h-40px flex items-center justify-center cursor-pointer transition-colors rd-8px',
-                      isActive ? '!bg-active' : 'hover:bg-fill-3 active:bg-fill-4'
-                    )}
-                    onClick={() => handleTeamClick(team.id)}
-                  >
-                    <Peoples
-                      data-testid={`collapsed-team-icon-${team.id}`}
-                      data-icon-fill={iconColors.primary}
-                      theme='outline'
-                      size='16'
-                      fill={iconColors.primary}
-                      style={{ lineHeight: 0 }}
-                    />
-                    {(teamBadgeCounts.get(team.id) ?? 0) > 0 && (
-                      <span
-                        className='absolute top-4px right-4px w-18px h-18px rounded-full text-10px font-bold flex items-center justify-center leading-none bg-danger-6 text-white'
-                        style={{ lineHeight: 1 }}
-                      >
-                        {(teamBadgeCounts.get(team.id) ?? 0) > 99 ? '99+' : teamBadgeCounts.get(team.id)}
-                      </span>
-                    )}
-                  </div>
-                </Tooltip>
-              );
-            })}
-          </div>
-        )
+        <div className='shrink-0 flex flex-col gap-2px'>
+          <Tooltip {...siderTooltipProps} content={t('team.sider.createTeam')} position='right'>
+            <div
+              data-testid='collapsed-team-create-btn'
+              className='relative w-full h-40px flex items-center justify-center cursor-pointer transition-colors rd-8px hover:bg-fill-3 active:bg-fill-4 text-t-secondary hover:text-t-primary'
+              onClick={() => setCreateTeamVisible(true)}
+            >
+              <Plus theme='outline' size='16' fill='currentColor' style={{ lineHeight: 0 }} />
+            </div>
+          </Tooltip>
+          {sortedTeams.map((team) => {
+            const isActive = pathname.startsWith(`/team/${team.id}`);
+            return (
+              <Tooltip key={team.id} {...siderTooltipProps} content={team.name} position='right'>
+                <div
+                  data-testid={`collapsed-team-item-${team.id}`}
+                  className={classNames(
+                    'relative w-full h-40px flex items-center justify-center cursor-pointer transition-colors rd-8px',
+                    isActive ? '!bg-active' : 'hover:bg-fill-3 active:bg-fill-4'
+                  )}
+                  onClick={() => handleTeamClick(team.id)}
+                >
+                  <Peoples
+                    data-testid={`collapsed-team-icon-${team.id}`}
+                    data-icon-fill={iconColors.primary}
+                    theme='outline'
+                    size='16'
+                    fill={iconColors.primary}
+                    style={{ lineHeight: 0 }}
+                  />
+                  {(teamBadgeCounts.get(team.id) ?? 0) > 0 && (
+                    <span
+                      className='absolute top-4px right-4px w-18px h-18px rounded-full text-10px font-bold flex items-center justify-center leading-none bg-danger-6 text-white'
+                      style={{ lineHeight: 1 }}
+                    >
+                      {(teamBadgeCounts.get(team.id) ?? 0) > 99 ? '99+' : teamBadgeCounts.get(team.id)}
+                    </span>
+                  )}
+                </div>
+              </Tooltip>
+            );
+          })}
+        </div>
       ) : (
         <div className='shrink-0 flex flex-col gap-2px'>
           <div
