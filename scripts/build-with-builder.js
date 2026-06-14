@@ -305,6 +305,11 @@ const skipVite = args.includes('--skip-vite');
 const skipNative = args.includes('--skip-native');
 const packOnly = args.includes('--pack-only');
 const forceBuild = args.includes('--force');
+const localMacBuild =
+  process.platform === 'darwin' &&
+  args.includes('--mac') &&
+  process.env.CI !== 'true' &&
+  process.env.AIONUI_APPLE_SIGN !== 'true';
 
 const builderArgs = args
   .filter((arg) => {
@@ -387,6 +392,11 @@ if (skipVite) console.log('⚡ --skip-vite: Will skip Vite compilation if output
 if (skipNative) console.log('⚡ --skip-native: Will skip native module rebuilding');
 if (packOnly) console.log('⚡ --pack-only: Will skip electron-builder distributable creation');
 if (forceBuild) console.log('⚡ --force: Force full rebuild');
+if (localMacBuild) console.log('🔏 Local mac build: Apple identity auto-discovery disabled; afterPack will ad-hoc sign');
+
+if (localMacBuild && process.env.CSC_IDENTITY_AUTO_DISCOVERY === undefined) {
+  process.env.CSC_IDENTITY_AUTO_DISCOVERY = 'false';
+}
 
 const packageJsonPath = path.resolve(__dirname, '../package.json');
 

@@ -2,8 +2,9 @@
  * Prepare aioncore binary for packaging.
  *
  * Resolution order:
- *  1. GitHub Actions artifact download when AIONUI_BACKEND_RUN_ID is set
- *  2. GitHub release download (requires version or defaults to "latest")
+ *  1. Local binary when AIONUI_LOCAL_AIONCORE_PATH is set
+ *  2. GitHub Actions artifact download when AIONUI_BACKEND_RUN_ID is set
+ *  3. GitHub release download (requires version or defaults to "latest")
  *
  * Output: {projectRoot}/resources/bundled-aioncore/{platform}-{arch}/
  *   - aioncore[.exe]
@@ -455,8 +456,20 @@ function prepareAioncore(options) {
   let sourceDetail = {};
   let tempDir = null;
 
+  const localAioncorePath = process.env.AIONUI_LOCAL_AIONCORE_PATH;
+  if (localAioncorePath) {
+    const resolvedLocalPath = path.resolve(localAioncorePath);
+    if (!fs.existsSync(resolvedLocalPath)) {
+      throw new Error(`AIONUI_LOCAL_AIONCORE_PATH does not exist: ${resolvedLocalPath}`);
+    }
+    sourcePath = resolvedLocalPath;
+    sourceType = 'local';
+    sourceDetail = { path: resolvedLocalPath };
+    console.log(`  Using local aioncore binary: ${resolvedLocalPath}`);
+  }
+
   // 1. Download from GitHub Actions artifacts when manual build run id is provided.
-  if (actionsRunId) {
+  if (!sourcePath && actionsRunId) {
     const result = downloadAndExtractActionsArtifact(platform, arch, actionsRunId);
     sourcePath = result.binaryPath;
     tempDir = result.tempDir;

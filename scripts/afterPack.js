@@ -1,4 +1,5 @@
 const { Arch } = require('builder-util');
+const { execFileSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
@@ -35,6 +36,29 @@ function verifyBundledResources(resourcesDir, electronPlatformName, targetArch) 
   }
 
   console.log(`   ✓ Bundled resources verified for ${result.runtimeKey} (${result.checked.length} checks)`);
+}
+
+function shouldAdHocSignDarwinApp(electronPlatformName) {
+  return (
+    electronPlatformName === 'darwin' &&
+    process.env.CI !== 'true' &&
+    process.env.AIONUI_APPLE_SIGN !== 'true' &&
+    process.env.AIONUI_SKIP_LOCAL_ADHOC_SIGN !== 'true'
+  );
+}
+
+function adHocSignDarwinApp(appOutDir, packager) {
+  const appName = packager?.appInfo?.productFilename || 'AionUi';
+  const appPath = path.join(appOutDir, `${appName}.app`);
+
+  if (!fs.existsSync(appPath)) {
+    throw new Error(`Cannot ad-hoc sign missing app bundle: ${appPath}`);
+  }
+
+  console.log(`   Locally ad-hoc signing ${appPath}`);
+  execFileSync('codesign', ['--force', '--deep', '--sign', '-', appPath], { stdio: 'inherit' });
+  execFileSync('codesign', ['--verify', '--deep', '--strict', '--verbose=2', appPath], { stdio: 'inherit' });
+  console.log(`   ✓ Local ad-hoc signature verified`);
 }
 
 module.exports = async function afterPack(context) {
@@ -78,6 +102,9 @@ module.exports = async function afterPack(context) {
   }
 
   if (!isCrossCompile && !needsSameArchRebuild && !forceRebuild) {
+    if (shouldAdHocSignDarwinApp(electronPlatformName)) {
+      adHocSignDarwinApp(appOutDir, packager);
+    }
     console.log(`   ✓ Same architecture, rebuild skipped (set FORCE_NATIVE_REBUILD=true to override)\n`);
     return;
   }
@@ -220,6 +247,10 @@ module.exports = async function afterPack(context) {
 
   if (failedModules.length > 0) {
     throw new Error(`Failed to rebuild modules for ${electronPlatformName}-${targetArch}: ${failedModules.join(', ')}`);
+  }
+
+  if (shouldAdHocSignDarwinApp(electronPlatformName)) {
+    adHocSignDarwinApp(appOutDir, packager);
   }
 
   console.log(`✅ All native modules rebuilt successfully for ${targetArch}\n`);
