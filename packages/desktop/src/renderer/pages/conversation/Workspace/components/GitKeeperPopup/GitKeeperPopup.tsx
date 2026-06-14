@@ -592,8 +592,10 @@ const GitKeeperPopup: React.FC<GitKeeperPopupProps> = ({ workspace, conversation
           throw new Error(result.msg || t('conversation.workspace.gitkeeper.codexAdvisoryFailed'));
         }
         setAdvisory(result.data);
+        return result.data;
       } catch (err) {
         setAdvisoryError(err instanceof Error ? err.message : String(err));
+        return null;
       } finally {
         setAdvisoryLoading(false);
       }
@@ -717,16 +719,18 @@ const GitKeeperPopup: React.FC<GitKeeperPopupProps> = ({ workspace, conversation
     await executeGitKeeperCards(executionCards);
   }, [approvedCards, executeGitKeeperCards]);
 
-  const sendAdvisoryQuestion = useCallback(() => {
+  const sendAdvisoryQuestion = useCallback(async () => {
     if (!state || !advisoryQuestion.trim()) return;
     const question = advisoryQuestion.trim();
     setAdvisoryQuestion('');
     if (/^(ok|okay|yes|approve|approved|go|sync)$/i.test(question) && advisory?.cards.length) {
-      setApprovedCards(advisory.cards);
-      void executeGitKeeperCards(advisory.cards);
+      const approvedAdvisory = await loadAdvisory(state, question);
+      const executionCards = approvedAdvisory?.cards.length ? approvedAdvisory.cards : advisory.cards;
+      setApprovedCards(executionCards);
+      await executeGitKeeperCards(executionCards);
       return;
     }
-    void loadAdvisory(state, question);
+    await loadAdvisory(state, question);
     setApprovedCards([]);
   }, [advisory, advisoryQuestion, executeGitKeeperCards, loadAdvisory, state]);
 

@@ -26,12 +26,10 @@ const execFileAsync = promisify(execFile);
 const GITKEEPER_CLI = '/Users/richard/coding-projects/github-repos/gitkeeper/dist/cli.js';
 const NODE_BIN = '/Users/richard/Coding Tools/bin/node';
 const GIT_BIN = '/Users/richard/Coding Tools/bin/git';
-const CODEX_BIN = '/Users/richard/.local/bin/codex';
-const CODEX_HOME = '/Users/richard/.codex-aion-ollama-qwen3-30b';
 const EXEC_TIMEOUT_MS = 15_000;
-const CODEX_TIMEOUT_MS = 30_000;
+const GITKEEPER_OPERATION_TIMEOUT_MS = 120_000;
 const PENDING_SYNC_TIMEOUT_MS = 30_000;
-const advisorySessions = new Map<string, string[]>();
+const advisorySessions = new Map<string, string>();
 
 function normalizeMachineName(raw: string): string {
   const value = raw.trim().toLowerCase();
@@ -123,135 +121,99 @@ async function retryPendingPeerSyncs(): Promise<void> {
   }
 }
 
-function extractJsonObject(raw: string): string {
-  const start = raw.indexOf('{');
-  const end = raw.lastIndexOf('}');
-  if (start < 0 || end < start) throw new Error('Codex advisory did not return JSON.');
-  return raw.slice(start, end + 1);
-}
-
 function advisorySessionId(request: GitKeeperAdvisoryRequest): string {
   return `${request.threadId?.trim() || 'popup'}:${request.workspace}`;
 }
 
-function advisoryPrompt(request: GitKeeperAdvisoryRequest, history: string[]): string {
-  return [
-    'You are GitKeeper v2 advisory mode inside the Aion popup.',
-    'Read-only task: summarize dirty repo state and recommend an explicit per-repo commit/sync plan.',
-    'Do not edit files, run mutation commands, commit, push, reset, stash, or discard anything.',
-    'Return strict JSON only with this shape:',
-    '{"temporaryThreadId":"string","cards":[{"repositoryId":"string","summary":"string","recommendation":"string","approvedFiles":["path"],"commitMessage":"string","risks":["string"]}],"answer":"string"}',
-    'Use concise, practical recommendations. If the user asks a follow-up question, answer it in the same JSON answer field and keep cards current.',
-    `Workspace: ${request.workspace}`,
-    `Thread id: ${request.threadId ?? 'unknown'}`,
-    `Recent advisory chat: ${history.slice(-6).join('\n') || 'none'}`,
-    `User question: ${request.question?.trim() || 'Initial advisory summary and recommendation.'}`,
-    `GitKeeper popup state JSON: ${JSON.stringify(request.state)}`,
-  ].join('\n\n');
+type GitKeeperAdvisorySession = {
+  sessionId: string;
+  provider?: string;
+  recommendationCards?: Array<{
+    repositoryId?: string;
+    summary?: string;
+    recommendation?: string;
+    action?: string;
+    files?: string[];
+    commitMessage?: string;
+    blockers?: string[];
+  }>;
+  messages?: Array<{ role?: string; content?: string }>;
+  diagnostics?: string[];
+};
+
+function mapAdvisorySessionToResponse(session: GitKeeperAdvisorySession): GitKeeperAdvisoryResponse {
+  const cards = (session.recommendationCards ?? []).map((card) => ({
+    repositoryId: card.repositoryId ?? 'repository',
+    summary: card.summary ?? 'GitKeeper advisory recommendation.',
+    recommendation: card.recommendation ?? 'Review before protected execution.',
+    approvedFiles: card.action === 'gitignore_files' || card.action === 'leave_uncommitted' ? [] : card.files ?? [],
+    commitMessage: card.commitMessage ?? '',
+    risks: [
+      ...(card.blockers ?? []),
+      ...(session.diagnostics ?? []),
+    ],
+  }));
+  const answer = [...(session.messages ?? [])]
+    .reverse()
+    .find((message) => message.role === 'assistant')?.content
+    ?? (cards.length > 0
+      ? 'GitKeeper produced advisory recommendation cards. Type ok or press Approve plan to validate and execute them.'
+      : 'GitKeeper found no advisory cards for this workspace.');
+  return {
+    temporaryThreadId: session.sessionId,
+    provider: session.provider === 'codex_cli' ? 'codex' : session.provider ?? 'deterministic',
+    cards,
+    answer,
+  };
 }
 
 async function buildAdvisory(request: GitKeeperAdvisoryRequest): Promise<GitKeeperAdvisoryResponse> {
   const sessionId = advisorySessionId(request);
-  const history = advisorySessions.get(sessionId) ?? [];
-  if (request.question?.trim()) {
-    history.push(`User: ${request.question.trim()}`);
-  }
-
-  if (!existsSync(CODEX_BIN)) {
-    console.warn('[GitKeeper] Codex advisory fallback: Codex CLI is not available');
-    const response = buildDeterministicAdvisory(request, 'Codex CLI is not available.');
-    history.push(`GitKeeper: ${response.answer}`);
-    advisorySessions.set(sessionId, history);
-    return response;
-  }
-
   const tempDir = mkdtempSync(path.join(os.tmpdir(), 'gitkeeper-advisory-'));
-  const outputFile = path.join(tempDir, 'last-message.json');
-
+  const popupStateFile = path.join(tempDir, 'popup-state.json');
   try {
-    try {
-      console.info('[GitKeeper] Codex advisory start', {
-        sessionId,
-        workspace: request.workspace,
-        question: request.question?.trim() || 'initial',
-      });
-      await execFileAsync(
-        CODEX_BIN,
-        ['exec', '--cd', request.workspace, '--sandbox', 'read-only', '--output-last-message', outputFile, advisoryPrompt(request, history)],
-        {
-          timeout: CODEX_TIMEOUT_MS,
-          maxBuffer: 10 * 1024 * 1024,
-          env: {
-            ...process.env,
-            CODEX_HOME,
-          },
-        }
+    const existingSessionId = advisorySessions.get(sessionId);
+    const question = request.question?.trim();
+    if (existingSessionId && question) {
+      const { stdout } = await execFileAsync(
+        NODE_BIN,
+        [
+          GITKEEPER_CLI,
+          'advisory',
+          'message',
+          '--session-id',
+          existingSessionId,
+          '--message',
+          question,
+          '--actor',
+          'aion',
+        ],
+        { timeout: GITKEEPER_OPERATION_TIMEOUT_MS, maxBuffer: 10 * 1024 * 1024 }
       );
-    } catch (error) {
-      const reason = error instanceof Error ? error.message : String(error);
-      console.warn('[GitKeeper] Codex advisory fallback after exec failure', { sessionId, reason });
-      const response = buildDeterministicAdvisory(request, reason);
-      history.push(`GitKeeper: ${response.answer}`);
-      advisorySessions.set(sessionId, history);
-      return response;
+      const result = JSON.parse(stdout) as { session: GitKeeperAdvisorySession };
+      return mapAdvisorySessionToResponse(result.session);
     }
-    if (!existsSync(outputFile)) {
-      console.warn('[GitKeeper] Codex advisory fallback: output file missing', { sessionId, outputFile });
-      const response = buildDeterministicAdvisory(request, 'Codex exited without writing an advisory message.');
-      history.push(`GitKeeper: ${response.answer}`);
-      advisorySessions.set(sessionId, history);
-      return response;
-    }
-    const response = JSON.parse(extractJsonObject(readFileSync(outputFile, 'utf8'))) as GitKeeperAdvisoryResponse;
-    response.provider = 'codex';
-    console.info('[GitKeeper] Codex advisory succeeded', {
-      sessionId,
-      cards: response.cards.length,
-    });
-    history.push(`GitKeeper: ${response.answer}`);
-    advisorySessions.set(sessionId, history);
-    return response;
+
+    writeFileSync(popupStateFile, JSON.stringify(request.state, null, 2));
+    const { stdout } = await execFileAsync(
+      NODE_BIN,
+      [
+        GITKEEPER_CLI,
+        'advisory',
+        'start',
+        '--popup-state-file',
+        popupStateFile,
+        '--provider',
+        'codex_cli',
+      ],
+      { timeout: GITKEEPER_OPERATION_TIMEOUT_MS, maxBuffer: 10 * 1024 * 1024 }
+    );
+    const result = JSON.parse(stdout) as { session: GitKeeperAdvisorySession };
+    advisorySessions.set(sessionId, result.session.sessionId);
+    return mapAdvisorySessionToResponse(result.session);
   } finally {
     rmSync(tempDir, { recursive: true, force: true });
   }
-}
-
-function buildDeterministicAdvisory(request: GitKeeperAdvisoryRequest, reason: string): GitKeeperAdvisoryResponse {
-  const question = request.question?.trim();
-  return {
-    temporaryThreadId: request.threadId ? `gitkeeper-${request.threadId}` : 'gitkeeper-popup',
-    provider: 'deterministic',
-    cards: request.state.repoCards.map((card) => {
-      const files = Array.from(new Set([...card.dirtyFiles, ...card.leftBehindFiles]));
-      const repoName = card.repositoryId.split('/').at(-1) ?? card.repositoryId;
-      const hardBlockers = card.blockers.filter((blocker) => !['approved_files_required', 'dirty_files_not_approved'].includes(blocker));
-      const groupedSummary = files.length === 0
-        ? 'No dirty files detected.'
-        : files.length <= 3
-        ? `Dirty source files: ${files.join(', ')}.`
-        : `${files.length} dirty source files grouped for one protected GitKeeper checkpoint.`;
-      const recommendation = hardBlockers.length > 0
-        ? `Do not auto-sync yet. Resolve blockers first: ${hardBlockers.join(', ')}.`
-        : files.length > 0
-        ? 'Commit the source-owned dirt, push it, then fast-forward clean peers. If a peer has unrelated dirt, leave that peer pending and show the reason.'
-        : 'Push the source branch if needed and fast-forward available peers.';
-      return {
-        repositoryId: card.repositoryId,
-        summary: groupedSummary,
-        recommendation,
-        approvedFiles: hardBlockers.length > 0 ? [] : files,
-        commitMessage: files.length > 0 ? `Update ${repoName}` : '',
-        risks: reason ? [`Codex advisory fallback used: ${reason}`] : [],
-      };
-    }),
-    answer: [
-      question ? `Question: ${question}` : 'Initial GitKeeper advisory.',
-      reason
-        ? `Codex advisory was unavailable, so GitKeeper produced a deterministic recommendation. ${reason}`
-        : 'GitKeeper produced a deterministic recommendation.',
-      'If the recommendation is acceptable, type ok or press Approve plan, then GitKeeper will execute through the protected operation route.',
-    ].join(' '),
-  };
 }
 
 function approvedPreflightFor(request: GitKeeperExecuteApprovedPlanRequest): Record<string, unknown> {
@@ -313,6 +275,27 @@ function formatGroupExecutionResult(result: Record<string, unknown>): GitKeeperE
   };
 }
 
+async function archiveAdvisoryFor(request: GitKeeperExecuteApprovedPlanRequest): Promise<void> {
+  if (!request.threadId?.trim()) return;
+  const key = `${request.threadId.trim()}:${request.workspace}`;
+  const sessionId = advisorySessions.get(key);
+  if (!sessionId) return;
+  try {
+    await execFileAsync(
+      NODE_BIN,
+      [GITKEEPER_CLI, 'advisory', 'archive', '--session-id', sessionId],
+      { timeout: EXEC_TIMEOUT_MS, maxBuffer: 1024 * 1024 }
+    );
+  } catch (error) {
+    console.warn('[GitKeeper] advisory archive deferred', {
+      sessionId,
+      reason: error instanceof Error ? error.message : String(error),
+    });
+  } finally {
+    advisorySessions.delete(key);
+  }
+}
+
 async function executeApprovedPlan(
   request: GitKeeperExecuteApprovedPlanRequest
 ): Promise<GitKeeperExecuteApprovedPlanResponse> {
@@ -342,15 +325,13 @@ async function executeApprovedPlan(
       '--idempotency-key',
       request.threadId?.trim() ? `aion-popup:${request.threadId.trim()}` : `aion-popup:${sourceMachine}:${Date.now()}`,
     ],
-    { timeout: CODEX_TIMEOUT_MS, maxBuffer: 20 * 1024 * 1024 }
+    { timeout: GITKEEPER_OPERATION_TIMEOUT_MS, maxBuffer: 20 * 1024 * 1024 }
   ).finally(() => {
     rmSync(tempDir, { recursive: true, force: true });
   });
   const result = JSON.parse(stdout) as Record<string, unknown>;
 
-  if (request.threadId?.trim()) {
-    advisorySessions.delete(`${request.threadId.trim()}:${request.workspace}`);
-  }
+  await archiveAdvisoryFor(request);
 
   return formatGroupExecutionResult(result);
 }
