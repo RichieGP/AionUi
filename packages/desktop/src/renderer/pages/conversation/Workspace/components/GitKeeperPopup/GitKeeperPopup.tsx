@@ -438,7 +438,7 @@ const AdvisoryPanel: React.FC<{
   question: string;
   onQuestionChange: (value: string) => void;
   onSend: () => void;
-  onApprove: () => void;
+  onApprove: () => void | Promise<void>;
 }> = ({ advisory, loading, error, approved, question, onQuestionChange, onSend, onApprove }) => {
   const { t } = useTranslation();
 
@@ -490,7 +490,7 @@ const AdvisoryPanel: React.FC<{
               ? t('conversation.workspace.gitkeeper.planApproved')
               : t('conversation.workspace.gitkeeper.planApprovalHint')}
           </div>
-          <Button type='primary' size='small' disabled={approved || loading} onClick={onApprove}>
+          <Button type='primary' size='small' disabled={approved || loading} onClick={() => void onApprove()}>
             {approved
               ? t('conversation.workspace.gitkeeper.planApprovedButton')
               : t('conversation.workspace.gitkeeper.approvePlan')}
@@ -631,11 +631,6 @@ const GitKeeperPopup: React.FC<GitKeeperPopupProps> = ({ workspace, conversation
     }
   }, [buildAutomaticPlan, conversationId, loadAdvisory, needsAdvisory, t, workspace]);
 
-  const approveCurrentPlan = useCallback(() => {
-    if (!advisory) return;
-    setApprovedCards(advisory.cards);
-  }, [advisory]);
-
   const executeGitKeeperCards = useCallback(async (executionCards: GitKeeperAdvisoryResponse['cards']) => {
     if (!state) return;
     setExecuting(true);
@@ -665,6 +660,12 @@ const GitKeeperPopup: React.FC<GitKeeperPopupProps> = ({ workspace, conversation
       setExecuting(false);
     }
   }, [conversationId, loadPopupState, state, t, workspace]);
+
+  const approveCurrentPlan = useCallback(async () => {
+    if (!advisory) return;
+    setApprovedCards(advisory.cards);
+    await executeGitKeeperCards(advisory.cards);
+  }, [advisory, executeGitKeeperCards]);
 
   const executeGitKeeperCardsFromState = useCallback(async (
     popupState: GitKeeperPopupState,
