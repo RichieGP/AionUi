@@ -26,6 +26,12 @@ const execFileAsync = promisify(execFile);
 const GITKEEPER_CLI = '/Users/richard/coding-projects/github-repos/gitkeeper/dist/cli.js';
 const NODE_BIN = '/Users/richard/Coding Tools/bin/node';
 const GIT_BIN = '/Users/richard/Coding Tools/bin/git';
+const CODEX_BIN_CANDIDATES = [
+  process.env.GITKEEPER_CODEX_COMMAND,
+  '/opt/homebrew/bin/codex',
+  '/usr/local/bin/codex',
+  '/Users/richard/Coding Tools/bin/codex',
+].filter((candidate): candidate is string => Boolean(candidate));
 const EXEC_TIMEOUT_MS = 15_000;
 const GITKEEPER_OPERATION_TIMEOUT_MS = 120_000;
 const PENDING_SYNC_TIMEOUT_MS = 30_000;
@@ -125,6 +131,10 @@ function advisorySessionId(request: GitKeeperAdvisoryRequest): string {
   return `${request.threadId?.trim() || 'popup'}:${request.workspace}`;
 }
 
+function resolveCodexCommand(): string | null {
+  return CODEX_BIN_CANDIDATES.find((candidate) => existsSync(candidate)) ?? null;
+}
+
 type GitKeeperAdvisorySession = {
   sessionId: string;
   provider?: string;
@@ -174,20 +184,25 @@ async function buildAdvisory(request: GitKeeperAdvisoryRequest): Promise<GitKeep
   try {
     const existingSessionId = advisorySessions.get(sessionId);
     const question = request.question?.trim();
+    const codexCommand = resolveCodexCommand();
     if (existingSessionId && question) {
+      const args = [
+        GITKEEPER_CLI,
+        'advisory',
+        'message',
+        '--session-id',
+        existingSessionId,
+        '--message',
+        question,
+        '--actor',
+        'aion',
+      ];
+      if (codexCommand) {
+        args.push('--codex-command', codexCommand);
+      }
       const { stdout } = await execFileAsync(
         NODE_BIN,
-        [
-          GITKEEPER_CLI,
-          'advisory',
-          'message',
-          '--session-id',
-          existingSessionId,
-          '--message',
-          question,
-          '--actor',
-          'aion',
-        ],
+        args,
         { timeout: GITKEEPER_OPERATION_TIMEOUT_MS, maxBuffer: 10 * 1024 * 1024 }
       );
       const result = JSON.parse(stdout) as { session: GitKeeperAdvisorySession };
@@ -205,6 +220,7 @@ async function buildAdvisory(request: GitKeeperAdvisoryRequest): Promise<GitKeep
         popupStateFile,
         '--provider',
         'codex_cli',
+        ...(codexCommand ? ['--codex-command', codexCommand] : []),
       ],
       { timeout: GITKEEPER_OPERATION_TIMEOUT_MS, maxBuffer: 10 * 1024 * 1024 }
     );
