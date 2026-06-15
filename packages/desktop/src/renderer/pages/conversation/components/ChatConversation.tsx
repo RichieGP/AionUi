@@ -243,12 +243,15 @@ const ChatConversation: React.FC<{
     }
     switch (conversation.type) {
       case 'acp':
+      case 'codex-app-server':
         return (
           <AcpChat
             key={conversation.id}
             conversation_id={conversation.id}
             workspace={conversation.extra?.workspace}
-            backend={conversation.extra?.backend || 'claude'}
+            backend={
+              conversation.type === 'codex-app-server' ? 'codex-app-server' : conversation.extra?.backend || 'claude'
+            }
             session_mode={conversation.extra?.session_mode}
             agent_name={assistantDisplayName}
             cron_job_id={(conversation.extra as { cron_job_id?: string })?.cron_job_id}
@@ -282,12 +285,12 @@ const ChatConversation: React.FC<{
     if (!conversation || isAionrsConversation) return undefined;
     if (isMobile) return undefined;
     if (isLegacyReadOnlyConversation) return undefined;
-    if (conversation.type === 'acp') {
+    if (conversation.type === 'acp' || conversation.type === 'codex-app-server') {
       const extra = conversation.extra as { backend?: string; current_model_id?: string };
       return (
         <AcpModelSelector
           conversation_id={conversation.id}
-          backend={extra.backend}
+          backend={conversation.type === 'codex-app-server' ? 'codex-app-server' : extra.backend}
           initialModelId={extra.current_model_id}
           waitForWarmup
           persistGlobalPreference={!acpAssistantId}
@@ -313,17 +316,19 @@ const ChatConversation: React.FC<{
           backend:
             conversation?.type === 'acp'
               ? conversation?.extra?.backend
-              : conversation?.type === 'aionrs'
-                ? 'aionrs'
-                : conversation?.type === 'codex'
-                  ? 'codex'
-                  : conversation?.type === 'openclaw-gateway'
-                    ? 'openclaw-gateway'
-                    : conversation?.type === 'nanobot'
-                      ? 'nanobot'
-                      : conversation?.type === 'remote'
-                        ? 'remote'
-                        : undefined,
+              : conversation?.type === 'codex-app-server'
+                ? 'codex-app-server'
+                : conversation?.type === 'aionrs'
+                  ? 'aionrs'
+                  : conversation?.type === 'codex'
+                    ? 'codex'
+                    : conversation?.type === 'openclaw-gateway'
+                      ? 'openclaw-gateway'
+                      : conversation?.type === 'nanobot'
+                        ? 'nanobot'
+                        : conversation?.type === 'remote'
+                          ? 'remote'
+                          : undefined,
           agent_name: conversationAgentName,
         };
 

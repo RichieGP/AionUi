@@ -72,6 +72,11 @@ export const AGENT_MODES: Record<string, AgentModeOption[]> = {
     { value: CODEX_MODE_NATIVE_DEFAULT, label: 'Default' },
     { value: CODEX_MODE_NATIVE_FULL_ACCESS, label: 'Full Access' },
   ],
+  'codex-app-server': [
+    { value: CODEX_MODE_READ_ONLY, label: 'Read Only' },
+    { value: CODEX_MODE_NATIVE_DEFAULT, label: 'Default' },
+    { value: CODEX_MODE_NATIVE_FULL_ACCESS, label: 'Full Access' },
+  ],
   cursor: [
     { value: 'agent', label: 'Agent', description: 'Full agent capabilities with tool access' },
     { value: 'plan', label: 'Plan', description: 'Read-only mode for planning and designing before implementation' },

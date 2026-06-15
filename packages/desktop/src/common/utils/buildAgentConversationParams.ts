@@ -36,6 +36,7 @@ export type BuildAgentConversationInput = {
 };
 
 export function getConversationTypeForBackend(backend: string): ICreateConversationParams['type'] {
+  if (backend === 'codex-app-server') return 'codex-app-server';
   return backend === 'aionrs' ? 'aionrs' : 'acp';
 }
 
@@ -71,10 +72,10 @@ export function buildAgentConversationParams(input: BuildAgentConversationInput)
 
   if (is_preset) {
     extra.preset_assistant_id = effectivePresetAssistantId;
-    if (type === 'acp') {
+    if (type === 'acp' || type === 'codex-app-server') {
       extra.backend = effectivePresetType as string;
     }
-  } else if (type === 'acp') {
+  } else if (type === 'acp' || type === 'codex-app-server') {
     extra.backend = backend as string;
     extra.agent_name = agent_name || name;
     if (agent_id) extra.agent_id = agent_id;

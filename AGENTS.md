@@ -81,17 +81,37 @@ See the `testing` skill (`.claude/skills/testing/SKILL.md`) for complete workflo
 Auto-fix as you edit:
 
 ```bash
-bun run lint:fix       # auto-fix lint issues (oxlint)
-bun run format         # auto-format all files (oxfmt)
-bunx tsc --noEmit      # verify no type errors
+/Users/richard/Coding\ Tools/bin/bun run lint:fix       # auto-fix lint issues (oxlint)
+/Users/richard/Coding\ Tools/bin/bun run format         # auto-format all files (oxfmt)
+/Users/richard/Coding\ Tools/bin/bunx tsc --noEmit      # verify no type errors
 ```
 
 If your changes touch `packages/desktop/src/renderer/`, `locales/`, or `packages/desktop/src/common/config/i18n`, also run:
 
 ```bash
-bun run i18n:types
-node scripts/check-i18n.js
+/Users/richard/Coding\ Tools/bin/bun run i18n:types
+/Users/richard/Coding\ Tools/bin/node scripts/check-i18n.js
 ```
+
+Machine-level app tools are expected at `/Users/richard/Coding Tools/bin`.
+Use those stable paths for `node`, `npm`, `npx`, `pnpm`, `bun`, `bunx`,
+`playwright`, `just`, `pwsh`, `python`, `python3`, `prek`, and macOS
+packaging/signing tools before falling back to Homebrew or repo-local
+executables. Do not add these tools as dependencies just to satisfy an agent
+thread; if one is missing, fix or report the machine bootstrap issue.
+
+When running `just` recipes or app-server package scripts, prepend the central
+tools path so bare commands inside the recipe resolve consistently:
+
+```bash
+PATH="/Users/richard/Coding Tools/bin:$PATH" /Users/richard/Coding\ Tools/bin/just <recipe>
+```
+
+Signed/notarized app builds require more than installed programs. Before
+claiming a distributable macOS build, verify the target machine has the intended
+codesigning identity with `security find-identity -v -p codesigning` and that
+notarization/release credentials are present. Local ad-hoc signing is only a
+smoke-build step.
 
 ### Before Pushing
 
@@ -170,11 +190,13 @@ Daily agent workbench paths:
 | Git/GitHub              | `git`, `git-lfs`, `gh`, `ssh`, `gitignore`                                                               |
 | Downloads/sync          | `curl`, `wget`, `rsync`                                                                                  |
 | Data/config             | `jq`, `yq`, `plutil`                                                                                     |
-| JavaScript/TypeScript   | `node`, `npm`, `npx`, `pnpm`, `prettier`, `eslint`                                                       |
-| Python/tool runners     | `python3`, `uv`, `uvx`                                                                                   |
-| Shell/tool quality      | `shellcheck`, `shfmt`, `sh`, `bash`, `zsh`                                                               |
+| JavaScript/TypeScript   | `node`, `npm`, `npx`, `pnpm`, `bun`, `bunx`, `prettier`, `eslint`, `prek`                                |
+| Rust                    | `rustup`, `cargo`, `rustc`, `rustfmt`, `cargo-fmt`, `cargo-clippy`, `clippy-driver`, `rust-analyzer`, `cargo-nextest`, `cargo-audit` |
+| Python/tool runners     | `python`, `python3`, `uv`, `uvx`                                                                         |
+| Shell/tool quality      | `shellcheck`, `shfmt`, `pwsh`, `sh`, `bash`, `zsh`                                                       |
 | Archives/compression    | `tar`, `zip`, `unzip`, `gzip`, `gunzip`, `bzip2`, `bunzip2`                                              |
-| Build/platform basics   | `make`, `xcodebuild`, `swift`, `openssl`, `perl`, `ruby`                                                 |
+| Browser/app verification | `playwright`                                                                                            |
+| Build/platform basics   | `make`, `xcodebuild`, `swift`, `just`, `openssl`, `perl`, `ruby`, `codesign`, `security`, `xcrun`, `productbuild`, `hdiutil`, `ditto`, `lipo`, `otool` |
 
 Important stable executable paths:
 
@@ -197,6 +219,35 @@ Important stable executable paths:
 | `patch`       | `/Users/richard/Coding Tools/bin/patch`       |
 | `jq`          | `/Users/richard/Coding Tools/bin/jq`          |
 | `yq`          | `/Users/richard/Coding Tools/bin/yq`          |
+| `node`        | `/Users/richard/Coding Tools/bin/node`        |
+| `npm`         | `/Users/richard/Coding Tools/bin/npm`         |
+| `npx`         | `/Users/richard/Coding Tools/bin/npx`         |
+| `pnpm`        | `/Users/richard/Coding Tools/bin/pnpm`        |
+| `bun`         | `/Users/richard/Coding Tools/bin/bun`         |
+| `bunx`        | `/Users/richard/Coding Tools/bin/bunx`        |
+| `playwright`  | `/Users/richard/Coding Tools/bin/playwright`  |
+| `prek`        | `/Users/richard/Coding Tools/bin/prek`        |
+| `rustup`      | `/Users/richard/Coding Tools/bin/rustup`      |
+| `cargo`       | `/Users/richard/Coding Tools/bin/cargo`       |
+| `rustc`       | `/Users/richard/Coding Tools/bin/rustc`       |
+| `rustfmt`     | `/Users/richard/Coding Tools/bin/rustfmt`     |
+| `cargo-fmt`   | `/Users/richard/Coding Tools/bin/cargo-fmt`   |
+| `cargo-clippy` | `/Users/richard/Coding Tools/bin/cargo-clippy` |
+| `cargo-nextest` | `/Users/richard/Coding Tools/bin/cargo-nextest` |
+| `cargo-audit` | `/Users/richard/Coding Tools/bin/cargo-audit` |
+| `clippy-driver` | `/Users/richard/Coding Tools/bin/clippy-driver` |
+| `rust-analyzer` | `/Users/richard/Coding Tools/bin/rust-analyzer` |
+| `pwsh`        | `/Users/richard/Coding Tools/bin/pwsh`        |
+| `python`      | `/Users/richard/Coding Tools/bin/python`      |
+| `python3`     | `/Users/richard/Coding Tools/bin/python3`     |
+| `codesign`    | `/Users/richard/Coding Tools/bin/codesign`    |
+| `security`    | `/Users/richard/Coding Tools/bin/security`    |
+| `xcrun`       | `/Users/richard/Coding Tools/bin/xcrun`       |
+| `productbuild` | `/Users/richard/Coding Tools/bin/productbuild` |
+| `hdiutil`     | `/Users/richard/Coding Tools/bin/hdiutil`     |
+| `ditto`       | `/Users/richard/Coding Tools/bin/ditto`       |
+| `lipo`        | `/Users/richard/Coding Tools/bin/lipo`        |
+| `otool`       | `/Users/richard/Coding Tools/bin/otool`       |
 | `prettier`    | `/Users/richard/Coding Tools/bin/prettier`    |
 | `eslint`      | `/Users/richard/Coding Tools/bin/eslint`      |
 | `shellcheck`  | `/Users/richard/Coding Tools/bin/shellcheck`  |

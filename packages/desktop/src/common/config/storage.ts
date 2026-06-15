@@ -291,6 +291,35 @@ export type TChatConversation =
     >
   | Omit<
       IChatConversation<
+        'codex-app-server',
+        {
+          workspace?: string;
+          backend: string;
+          cli_path?: string;
+          custom_workspace?: boolean;
+          agent_name?: string;
+          custom_agent_id?: string;
+          preset_context?: string;
+          skills?: string[];
+          mcp_server_ids?: string[];
+          mcp_servers?: string[];
+          mcp_statuses?: IConversationMcpStatus[];
+          session_mcp_servers?: ISessionMcpServer[];
+          preset_assistant_id?: string;
+          pinned?: boolean;
+          pinned_at?: number;
+          session_mode?: string;
+          current_model_id?: string;
+          cached_config_options?: import('@/common/types/platform/acpTypes').AcpSessionConfigOption[];
+          pending_config_options?: Record<string, string>;
+          is_health_check?: boolean;
+          cron_job_id?: string;
+        }
+      >,
+      'model'
+    >
+  | Omit<
+      IChatConversation<
         'codex',
         {
           workspace?: string;

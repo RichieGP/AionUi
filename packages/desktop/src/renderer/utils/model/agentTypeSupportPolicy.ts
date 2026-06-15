@@ -1,4 +1,4 @@
-const SUPPORTED_NEW_CONVERSATION_AGENT_TYPES = new Set(['acp', 'aionrs']);
+const SUPPORTED_NEW_CONVERSATION_AGENT_TYPES = new Set(['acp', 'codex-app-server', 'aionrs']);
 const DEPRECATED_RUNTIME_AGENT_TYPES = new Set(['openclaw-gateway', 'nanobot', 'remote', 'gemini']);
 
 export function isSupportedNewConversationAgent(agent: { agent_type: string }): boolean {
@@ -9,16 +9,21 @@ export function isDeprecatedRuntimeAgentType(agentType?: string | null): boolean
   return Boolean(agentType && DEPRECATED_RUNTIME_AGENT_TYPES.has(agentType));
 }
 
-export function resolveSupportedConversationType(backend?: string | null): 'acp' | 'aionrs' {
+export function resolveSupportedConversationType(backend?: string | null): 'acp' | 'codex-app-server' | 'aionrs' {
+  if (backend === 'codex-app-server') return 'codex-app-server';
   return backend === 'aionrs' ? 'aionrs' : 'acp';
 }
 
 export function normalizeSupportedAgentSelection(
   agentType?: string,
   backend?: string
-): { agent_type: 'acp' | 'aionrs'; backend?: string } | undefined {
+): { agent_type: 'acp' | 'codex-app-server' | 'aionrs'; backend?: string } | undefined {
   if (agentType === 'aionrs' || backend === 'aionrs') {
     return { agent_type: 'aionrs' };
+  }
+
+  if (agentType === 'codex-app-server' || backend === 'codex-app-server') {
+    return { agent_type: 'codex-app-server', backend: 'codex-app-server' };
   }
 
   if (agentType === 'acp') {

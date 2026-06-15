@@ -1562,7 +1562,7 @@ export interface IConfirmMessageParams {
 }
 
 export interface ICreateConversationParams {
-  type: 'acp' | 'aionrs';
+  type: 'acp' | 'codex-app-server' | 'aionrs';
   id?: string;
   name?: string;
   model: TProviderWithModel;

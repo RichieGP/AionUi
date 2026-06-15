@@ -68,7 +68,7 @@ export function filterTeamSupportedAgents(agents: TeamAgentOption[]): TeamAgentO
   return agents.filter((a) => a.team_capable && !isDeprecatedRuntimeAgentType(a.agent_type));
 }
 
-export function resolveConversationType(backend: string): 'acp' | 'aionrs' {
+export function resolveConversationType(backend: string): 'acp' | 'codex-app-server' | 'aionrs' {
   return resolveSupportedConversationType(backend);
 }
 

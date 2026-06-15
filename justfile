@@ -129,9 +129,9 @@ rebuild-native:
     Write-Host "Rebuilding native modules for Electron $electronVer"
     Write-Host "=========================================="
     Write-Host ""
-    Write-Host "[Step 1] electron-rebuild..."
-    bunx electron-rebuild -f -w better-sqlite3
-    Write-Host "  OK  electron-rebuild completed"
+    Write-Host "[Step 1] electron-builder install-app-deps..."
+    pnpm exec electron-builder install-app-deps
+    Write-Host "  OK  native app dependencies rebuilt"
     Write-Host ""
     Write-Host "[Verify] Checking native modules..."
     $verified = $true

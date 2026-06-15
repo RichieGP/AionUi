@@ -27,7 +27,9 @@ const LocalAgents: React.FC = () => {
   const { agents: allAgents, revalidate: mutateAgents } = useAgents();
 
   const detectedAgents = allAgents.filter(
-    (a) => (a.agent_type === 'acp' || a.agent_type === 'aionrs') && a.agent_source !== 'custom'
+    (a) =>
+      (a.agent_type === 'acp' || a.agent_type === 'codex-app-server' || a.agent_type === 'aionrs') &&
+      a.agent_source !== 'custom'
   );
 
   const customAgents: AgentMetadata[] = allAgents.filter((a) => a.agent_source === 'custom');

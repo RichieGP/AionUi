@@ -10,7 +10,7 @@ import { ipcBridge } from '@/common';
 export const DETECTED_AGENTS_SWR_KEY = 'agents.detected';
 
 /** Type of an agent. */
-export type AgentType = 'acp' | 'remote' | 'aionrs' | 'openclaw-gateway' | 'nanobot';
+export type AgentType = 'acp' | 'codex-app-server' | 'remote' | 'aionrs' | 'openclaw-gateway' | 'nanobot';
 
 /** Source tier of an agent row, mirroring backend `agent_source` enum. */
 export type AgentSource = 'internal' | 'builtin' | 'extension' | 'custom';
